@@ -67,7 +67,7 @@ const ModuleWizard: React.FC<ModuleWizardProps> = ({ onClose, onCreated }) => {
 
     if (!user) return;
     rpcFetch<{ organizations?: { username: string }[] }>(
-      '/hades.api.registry.v1.UserService/GetUser',
+      '/hades.api.identity.v1.UserService/GetUser',
       { username: user }
     )
       .then(res => {
