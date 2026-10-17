@@ -35,6 +35,7 @@ var noAuthProcedures = map[string]bool{
 	"/hades.api.auth.v1.AuthenticationService/VerifyEmail":          true,
 	"/hades.api.auth.v1.AuthenticationService/RequestPasswordReset": true,
 	"/hades.api.auth.v1.AuthenticationService/ResetPassword":        true,
+	"/hades.api.auth.v1.AuthenticationService/GetSignupStatus":      true,
 	// Device/OAuth flows - begin before a session exists
 	"/hades.api.auth.v1.DeviceService/RequestDeviceCode": true,
 	"/hades.api.auth.v1.DeviceService/PollDeviceToken":   true,

@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSidebarCollapsed, setSidebarCollapsed, getTheme, setTheme, getRecentModules, getUsername, isSignedIn } from '../lib/auth';
 import { rpcFetch } from '../lib/rpc';
+import { useSignupEnabled } from '../lib/useSignupEnabled';
 import { useAuthStore } from '../stores/authStore';
 import { useWizardStore } from '../stores/wizardStore';
 import {
@@ -72,6 +73,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const { clearAuth, username } = useAuthStore();
   const { open: wizardOpen, openWizard, closeWizard } = useWizardStore();
+  const signupEnabled = useSignupEnabled();
   const [collapsed, setCollapsed] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -303,7 +305,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {!collapsed && 'Sign in'}
               {collapsed && <IconUser size={15}/>}
             </Link>
-            {!collapsed && (
+            {!collapsed && signupEnabled && (
               <Link href="/signup" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 gap: 8, padding: '7px 14px', borderRadius: 6, textDecoration: 'none',

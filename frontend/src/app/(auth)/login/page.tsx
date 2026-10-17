@@ -10,6 +10,7 @@ import Input from '@/components/ui/Input';
 import Btn from '@/components/ui/Button';
 import { IconShield, IconAlert, IconEye } from '@/components/icons';
 import Badge from '@/components/ui/Badge';
+import { useSignupEnabled } from '@/lib/useSignupEnabled';
 
 const GitHubIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -20,6 +21,7 @@ const GitHubIcon = () => (
 export default function PageLogin() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
+  const signupEnabled = useSignupEnabled();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -101,10 +103,12 @@ export default function PageLogin() {
           </div>
         </Card>
 
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-fg-muted)', marginTop: 20 }}>
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" style={{ color: 'var(--c-accent)', fontWeight: 500 }}>Create one</Link>
-        </p>
+        {signupEnabled && (
+          <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-fg-muted)', marginTop: 20 }}>
+            Don&apos;t have an account?{' '}
+            <Link href="/signup" style={{ color: 'var(--c-accent)', fontWeight: 500 }}>Create one</Link>
+          </p>
+        )}
       </div>
 
       <div style={{ marginTop: 32, fontSize: 12, color: 'var(--c-fg-subtle)', textAlign: 'center' }}>

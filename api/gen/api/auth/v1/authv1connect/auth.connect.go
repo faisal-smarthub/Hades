@@ -67,6 +67,9 @@ const (
 	// AuthenticationServiceChangePasswordProcedure is the fully-qualified name of the
 	// AuthenticationService's ChangePassword RPC.
 	AuthenticationServiceChangePasswordProcedure = "/hades.api.auth.v1.AuthenticationService/ChangePassword"
+	// AuthenticationServiceGetSignupStatusProcedure is the fully-qualified name of the
+	// AuthenticationService's GetSignupStatus RPC.
+	AuthenticationServiceGetSignupStatusProcedure = "/hades.api.auth.v1.AuthenticationService/GetSignupStatus"
 )
 
 // AuthenticationServiceClient is a client for the hades.api.auth.v1.AuthenticationService service.
@@ -125,6 +128,9 @@ type AuthenticationServiceClient interface {
 	//
 	// Returns UNAUTHENTICATED if old_password does not match.
 	ChangePassword(context.Context, *connect.Request[v1.ChangePasswordRequest]) (*connect.Response[v1.ChangePasswordResponse], error)
+	// GetSignupStatus reports whether Register currently accepts new accounts.
+	// Reachable without a session, same as Register itself.
+	GetSignupStatus(context.Context, *connect.Request[v1.GetSignupStatusRequest]) (*connect.Response[v1.GetSignupStatusResponse], error)
 }
 
 // NewAuthenticationServiceClient constructs a client for the
@@ -192,6 +198,12 @@ func NewAuthenticationServiceClient(httpClient connect.HTTPClient, baseURL strin
 			connect.WithSchema(authenticationServiceMethods.ByName("ChangePassword")),
 			connect.WithClientOptions(opts...),
 		),
+		getSignupStatus: connect.NewClient[v1.GetSignupStatusRequest, v1.GetSignupStatusResponse](
+			httpClient,
+			baseURL+AuthenticationServiceGetSignupStatusProcedure,
+			connect.WithSchema(authenticationServiceMethods.ByName("GetSignupStatus")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -206,6 +218,7 @@ type authenticationServiceClient struct {
 	requestPasswordReset    *connect.Client[v1.RequestPasswordResetRequest, v1.RequestPasswordResetResponse]
 	resetPassword           *connect.Client[v1.ResetPasswordRequest, v1.ResetPasswordResponse]
 	changePassword          *connect.Client[v1.ChangePasswordRequest, v1.ChangePasswordResponse]
+	getSignupStatus         *connect.Client[v1.GetSignupStatusRequest, v1.GetSignupStatusResponse]
 }
 
 // Login calls hades.api.auth.v1.AuthenticationService.Login.
@@ -251,6 +264,11 @@ func (c *authenticationServiceClient) ResetPassword(ctx context.Context, req *co
 // ChangePassword calls hades.api.auth.v1.AuthenticationService.ChangePassword.
 func (c *authenticationServiceClient) ChangePassword(ctx context.Context, req *connect.Request[v1.ChangePasswordRequest]) (*connect.Response[v1.ChangePasswordResponse], error) {
 	return c.changePassword.CallUnary(ctx, req)
+}
+
+// GetSignupStatus calls hades.api.auth.v1.AuthenticationService.GetSignupStatus.
+func (c *authenticationServiceClient) GetSignupStatus(ctx context.Context, req *connect.Request[v1.GetSignupStatusRequest]) (*connect.Response[v1.GetSignupStatusResponse], error) {
+	return c.getSignupStatus.CallUnary(ctx, req)
 }
 
 // AuthenticationServiceHandler is an implementation of the hades.api.auth.v1.AuthenticationService
@@ -310,6 +328,9 @@ type AuthenticationServiceHandler interface {
 	//
 	// Returns UNAUTHENTICATED if old_password does not match.
 	ChangePassword(context.Context, *connect.Request[v1.ChangePasswordRequest]) (*connect.Response[v1.ChangePasswordResponse], error)
+	// GetSignupStatus reports whether Register currently accepts new accounts.
+	// Reachable without a session, same as Register itself.
+	GetSignupStatus(context.Context, *connect.Request[v1.GetSignupStatusRequest]) (*connect.Response[v1.GetSignupStatusResponse], error)
 }
 
 // NewAuthenticationServiceHandler builds an HTTP handler from the service implementation. It
@@ -373,6 +394,12 @@ func NewAuthenticationServiceHandler(svc AuthenticationServiceHandler, opts ...c
 		connect.WithSchema(authenticationServiceMethods.ByName("ChangePassword")),
 		connect.WithHandlerOptions(opts...),
 	)
+	authenticationServiceGetSignupStatusHandler := connect.NewUnaryHandler(
+		AuthenticationServiceGetSignupStatusProcedure,
+		svc.GetSignupStatus,
+		connect.WithSchema(authenticationServiceMethods.ByName("GetSignupStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hades.api.auth.v1.AuthenticationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AuthenticationServiceLoginProcedure:
@@ -393,6 +420,8 @@ func NewAuthenticationServiceHandler(svc AuthenticationServiceHandler, opts ...c
 			authenticationServiceResetPasswordHandler.ServeHTTP(w, r)
 		case AuthenticationServiceChangePasswordProcedure:
 			authenticationServiceChangePasswordHandler.ServeHTTP(w, r)
+		case AuthenticationServiceGetSignupStatusProcedure:
+			authenticationServiceGetSignupStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -436,4 +465,8 @@ func (UnimplementedAuthenticationServiceHandler) ResetPassword(context.Context, 
 
 func (UnimplementedAuthenticationServiceHandler) ChangePassword(context.Context, *connect.Request[v1.ChangePasswordRequest]) (*connect.Response[v1.ChangePasswordResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hades.api.auth.v1.AuthenticationService.ChangePassword is not implemented"))
+}
+
+func (UnimplementedAuthenticationServiceHandler) GetSignupStatus(context.Context, *connect.Request[v1.GetSignupStatusRequest]) (*connect.Response[v1.GetSignupStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hades.api.auth.v1.AuthenticationService.GetSignupStatus is not implemented"))
 }

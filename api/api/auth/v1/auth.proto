@@ -150,6 +150,18 @@ message ChangePasswordRequest {
 // ChangePasswordResponse is empty.
 message ChangePasswordResponse {}
 
+// GetSignupStatusRequest is empty.
+message GetSignupStatusRequest {}
+
+// GetSignupStatusResponse reports whether Register currently accepts new
+// accounts.
+message GetSignupStatusResponse {
+  // False when auth.firstUserOnlySignup is set and an account already
+  // exists. A client uses this to decide whether to show a signup entry
+  // point at all, rather than let the user hit PERMISSION_DENIED on submit.
+  bool enabled = 1;
+}
+
 // AuthenticationService covers the full credential lifecycle for Hades accounts.
 //
 // Login, Register, and Signin are reachable without a session, as are
@@ -220,4 +232,8 @@ service AuthenticationService {
   //
   // Returns UNAUTHENTICATED if old_password does not match.
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+
+  // GetSignupStatus reports whether Register currently accepts new accounts.
+  // Reachable without a session, same as Register itself.
+  rpc GetSignupStatus(GetSignupStatusRequest) returns (GetSignupStatusResponse);
 }

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
@@ -10,6 +10,7 @@ import Input from '@/components/ui/Input';
 import Btn from '@/components/ui/Button';
 import { IconShield, IconAlert, IconEye, IconCheck, IconX } from '@/components/icons';
 import Badge from '@/components/ui/Badge';
+import { useSignupEnabled } from '@/lib/useSignupEnabled';
 
 function passwordStrength(p: string) {
   if (!p) return { score: 0, label: '', color: 'transparent' };
@@ -31,6 +32,7 @@ function passwordStrength(p: string) {
 export default function PageSignup() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
+  const signupEnabled = useSignupEnabled();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +43,12 @@ export default function PageSignup() {
   const [error, setError] = useState('');
 
   const strength = passwordStrength(password);
+
+  useEffect(() => {
+    if (!signupEnabled) router.replace('/login');
+  }, [signupEnabled, router]);
+
+  if (!signupEnabled) return null;
 
   const submit = async () => {
     if (!email || !username || !password || !confirm) { setError('Please fill in all fields.'); return; }

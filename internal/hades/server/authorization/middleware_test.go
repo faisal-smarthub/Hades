@@ -37,6 +37,7 @@ func knownProcedures() map[string]bool {
 		authv1connect.AuthenticationServiceRequestPasswordResetProcedure,
 		authv1connect.AuthenticationServiceResetPasswordProcedure,
 		authv1connect.AuthenticationServiceChangePasswordProcedure,
+		authv1connect.AuthenticationServiceGetSignupStatusProcedure,
 
 		authv1connect.SessionServiceListSessionsProcedure,
 		authv1connect.SessionServiceRevokeSessionProcedure,

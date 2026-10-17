@@ -73,6 +73,18 @@ func (s *Server) signupAllowed(ctx context.Context) (bool, error) {
 	return len(existing) == 0, nil
 }
 
+// GetSignupStatus reports whether Register will currently accept a new
+// account, so a client can hide its signup entry point instead of letting
+// the user hit PermissionDenied on submit.
+func (s *Server) GetSignupStatus(ctx context.Context, _ *connect.Request[v1.GetSignupStatusRequest]) (*connect.Response[v1.GetSignupStatusResponse], error) {
+	allowed, err := s.signupAllowed(ctx)
+	if err != nil {
+		s.logger.Error("failed to check signup eligibility", "error", err, "procedure", "GetSignupStatus")
+		return nil, connerr.Internal("failed to check signup status")
+	}
+	return &connect.Response[v1.GetSignupStatusResponse]{Msg: &v1.GetSignupStatusResponse{Enabled: allowed}}, nil
+}
+
 func (s *Server) Register(ctx context.Context, in *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {
 	if allowed, err := s.signupAllowed(ctx); err != nil {
 		s.logger.Error("failed to check signup eligibility", "error", err, "procedure", "Register")
