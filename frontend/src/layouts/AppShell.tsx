@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { to: '/search',            label: 'Search',        icon: <IconSearch size={15}/> },
 ];
 const BOTTOM_NAV = [
+  { to: '/settings/organizations', label: 'Organizations', icon: <IconBuilding size={15}/> },
   { to: '/settings/sessions', label: 'Sessions',      icon: <IconShield size={15}/> },
   { to: '/settings/tokens',   label: 'API Tokens',    icon: <IconKey size={15}/> },
   { to: '/settings',          label: 'Settings',      icon: <IconGear size={15}/> },
