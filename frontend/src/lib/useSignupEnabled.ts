@@ -11,8 +11,13 @@ export function useSignupEnabled(): boolean {
   const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
-    rpcFetch<{ enabled: boolean }>('/hades.api.auth.v1.AuthenticationService/GetSignupStatus', {})
-      .then(data => setEnabled(data.enabled !== false))
+    rpcFetch<{ enabled?: boolean }>('/hades.api.auth.v1.AuthenticationService/GetSignupStatus', {})
+      // protobuf JSON omits a bool field entirely when it's false, so a
+      // closed signup response is the literal body "{}", not
+      // {"enabled":false}. `!== false` treated that missing field as "not
+      // false" and always read as open; `=== true` is the only check that
+      // matches protobuf JSON's own default-omission rule.
+      .then(data => setEnabled(data.enabled === true))
       .catch(() => {});
   }, []);
 
