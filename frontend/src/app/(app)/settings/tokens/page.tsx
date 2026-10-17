@@ -43,10 +43,10 @@ export default function PageTokens() {
   useEffect(() => { loadTokens(); }, []);
 
   const createToken = async () => {
-    if (!newName) return;
+    const scopes = newScopes.split(',').map(s => s.trim()).filter(Boolean);
+    if (!newName || scopes.length === 0) return;
     setCreating(true);
     try {
-      const scopes = newScopes ? newScopes.split(',').map(s => s.trim()).filter(Boolean) : [];
       const data = await rpcFetch<{ id: string; token: string; prefix: string; created_at: string }>('/hades.api.auth.v1.APITokenService/CreateAPIToken', { name: newName, scopes });
       setNewTokenValue(data.token); setShowNew(false); setNewName(''); setNewScopes('');
       await loadTokens();
@@ -80,9 +80,17 @@ export default function PageTokens() {
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-fg)', marginBottom: 16 }}>Create new token</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div><label style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-fg-muted)', display: 'block', marginBottom: 6 }}>Token name</label><Input value={newName} onChange={setNewName} placeholder="e.g. ci-token"/></div>
-              <div><label style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-fg-muted)', display: 'block', marginBottom: 6 }}>Scopes (comma-separated, optional)</label><Input value={newScopes} onChange={setNewScopes} placeholder="module:read, module:write"/></div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-fg-muted)', display: 'block', marginBottom: 6 }}>Scopes (comma-separated, required)</label>
+                <Input value={newScopes} onChange={setNewScopes} placeholder="module:read, module:push"/>
+                <div style={{ fontSize: 11, color: 'var(--c-fg-subtle)', marginTop: 6 }}>
+                  At least one scope is required &mdash; an empty list would grant unrestricted access, so it&apos;s refused rather than assumed.{' '}
+                  Format: <code>resource:action</code> or <code>resource:action:owner/name</code>. Resources: <code>module</code>, <code>org</code>.{' '}
+                  Actions: <code>create</code>, <code>read</code>, <code>list</code>, <code>update</code>, <code>push</code>, <code>delete</code>, <code>admin</code>, <code>transfer</code>, <code>publish</code>, or <code>*</code> for all actions on a resource.
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <Btn variant="primary" onClick={createToken} disabled={creating || !newName}>{creating ? 'Creating…' : 'Create Token'}</Btn>
+                <Btn variant="primary" onClick={createToken} disabled={creating || !newName || !newScopes.trim()}>{creating ? 'Creating…' : 'Create Token'}</Btn>
                 <Btn variant="ghost" onClick={() => { setShowNew(false); setNewName(''); setNewScopes(''); }}>Cancel</Btn>
               </div>
             </div>
