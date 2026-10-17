@@ -20,7 +20,7 @@ server:
 backends:
   database: postgres
   git: gitaly
-  artifactStorage: s3
+  artifactStorage: disk
   cache: redis
 
 logger:
@@ -146,17 +146,7 @@ sdk:
       plugin: protoc-gen-go
       options: "paths=source_relative"
   storage:
-    type: s3
-    s3:
-      endpoint: "minio:9000"
-      bucket: "hades-sdks"
-      # Supplied through the environment. A default of minioadmin/minioadmin in
-      # a file that docker-compose mounts as the running configuration is a
-      # published credential, not a placeholder.
-      accessKeyId: "${HADES_S3_ACCESS_KEY_ID}"
-      secretAccessKey: "${HADES_S3_SECRET_ACCESS_KEY}"
-      useSSL: false
-      region: "us-east-1"
+    type: disk
 
 # OPA authorization engine tuning.
 # With cache: redis, bindings are invalidated across all pods immediately

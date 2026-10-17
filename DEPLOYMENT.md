@@ -11,7 +11,7 @@
 **1. Clone the repo on your server:**
 
 ```bash
-git clone https://github.com/alipourhabibi/Hades.git
+git clone https://github.com/faisal-smarthub/Hades.git
 cd Hades
 ```
 
@@ -27,9 +27,22 @@ totp:
   encryptionKey: "<64-char hex>"   # generate: openssl rand -hex 32
 ```
 
-Everything else in `config/prod.yaml` is pre-configured for the Docker Compose stack (Postgres, Gitaly, MinIO, Redis all use the internal Docker network).
+Everything else in `config/prod.yaml` is pre-configured for the Docker Compose stack (Postgres, Gitaly, Redis all use the internal Docker network; SDK artifacts go to local disk, not S3).
 
-**3. Set your domain and start:**
+**3. Create the data directories and start:**
+
+All state (Postgres, Gitaly repositories, SDK artifacts, Caddy's certs) is
+bind-mounted under `./data` rather than named Docker volumes, specifically so
+the whole service is one directory tree a backup tool like `restic` can point
+at directly. The `hades` container runs as a non-root user (uid `10001`), so
+its artifact directory needs to be writable by that uid before first start:
+
+```bash
+mkdir -p data/postgres data/gitaly data/artifacts data/caddy/data data/caddy/config
+sudo chown -R 10001:10001 data/artifacts
+```
+
+Then:
 
 ```bash
 DOMAIN=yourdomain.com docker compose up -d
@@ -46,9 +59,25 @@ That's it. Caddy automatically obtains a TLS certificate from Let's Encrypt on f
 | `frontend` | Next.js web UI (port 3000, internal) |
 | `postgres` | Metadata storage |
 | `gitaly` | Git repository storage |
-| `minio` | SDK artifact storage (S3-compatible) |
 | `redis` | Cache / rate limiting |
 | `migrator` | Runs DB migrations on startup, then exits |
+
+SDK artifact storage uses the `disk` backend (`backends.artifactStorage: disk`
+in `config/prod.yaml`), writing into the `hades` container's
+`./data/artifacts` bind mount — no S3/MinIO dependency.
+
+## Backups
+
+Everything durable lives under `./data`:
+
+```bash
+restic backup ./data
+```
+
+`postgres` and `gitaly` write to their data directories continuously, so for
+a consistent snapshot either accept the small window of inconsistency a live
+backup gives you, or briefly stop the stack (`docker compose stop postgres
+gitaly`) before backing up and `docker compose start postgres gitaly` after.
 
 ## Optional: change credentials
 
@@ -56,11 +85,9 @@ Default credentials are set in `docker-compose.yml` via environment variables. O
 
 ```bash
 POSTGRES_PASSWORD=strongpassword
-MINIO_ROOT_USER=admin
-MINIO_ROOT_PASSWORD=strongpassword
 ```
 
-Update the matching values in `config/prod.yaml` if you change Postgres or MinIO credentials.
+Update the matching value in `config/prod.yaml` if you change the Postgres password.
 
 ## OPA cache and multi-pod deployments
 
