@@ -21,6 +21,7 @@ import (
 	"github.com/alipourhabibi/Hades/internal/hades/server/buf/graph"
 	bufmodules "github.com/alipourhabibi/Hades/internal/hades/server/buf/modules"
 	"github.com/alipourhabibi/Hades/internal/hades/server/buf/upload"
+	"github.com/alipourhabibi/Hades/internal/hades/server/buf/uploadv1beta1"
 	commitsvc "github.com/alipourhabibi/Hades/internal/hades/server/commit"
 	contentsvc "github.com/alipourhabibi/Hades/internal/hades/server/content"
 	identitysvc "github.com/alipourhabibi/Hades/internal/hades/server/identity"
@@ -53,22 +54,23 @@ type SchemaRegistryServer struct {
 
 // SchemaRegistryServerSet holds all Connect-RPC service handlers.
 type SchemaRegistryServerSet struct {
-	AuthServer          *authsvc.Server
-	AuthorizationServer *authorization.Server
-	ModuleServer        *module.Server
-	CommitHandler       *commitsvc.Handler
-	ContentHandler      *contentsvc.Handler
-	MetaHandler         *metasvc.Handler
-	IdentityHandler     *identitysvc.Handler
-	NotifHandler        *notificationsvc.Handler
-	BufModuleServer     *bufmodules.Server
-	BufCommitServer     *bufcommits.Server
-	BufUploadServer     *bufupload.Server
-	BufGraphServer      *bufgraph.Server
-	BufDownloadServer   *bufdownload.Server
-	BufAlphaAuthnServer *bufauthn.Server
-	GoProxyHandler      *goproxy.Handler
-	SDKBackend          sdkstorage.Backend
+	AuthServer             *authsvc.Server
+	AuthorizationServer    *authorization.Server
+	ModuleServer           *module.Server
+	CommitHandler          *commitsvc.Handler
+	ContentHandler         *contentsvc.Handler
+	MetaHandler            *metasvc.Handler
+	IdentityHandler        *identitysvc.Handler
+	NotifHandler           *notificationsvc.Handler
+	BufModuleServer        *bufmodules.Server
+	BufCommitServer        *bufcommits.Server
+	BufUploadServer        *bufupload.Server
+	BufUploadV1Beta1Server *bufuploadv1beta1.Server
+	BufGraphServer         *bufgraph.Server
+	BufDownloadServer      *bufdownload.Server
+	BufAlphaAuthnServer    *bufauthn.Server
+	GoProxyHandler         *goproxy.Handler
+	SDKBackend             sdkstorage.Backend
 }
 
 // NewServer constructs a fully wired SchemaRegistryServer from config.
@@ -190,22 +192,23 @@ func NewServer(ctx context.Context, c *config.Config) (*SchemaRegistryServer, er
 	}
 
 	ss.serverSet = &SchemaRegistryServerSet{
-		AuthorizationServer: authorizationServer,
-		AuthServer:          authsvc.NewServer(deps),
-		ModuleServer:        module.NewServer(deps),
-		CommitHandler:       commitsvc.NewHandler(deps),
-		ContentHandler:      contentsvc.NewHandler(deps),
-		MetaHandler:         metasvc.NewHandler(deps),
-		IdentityHandler:     identitysvc.NewHandler(deps),
-		NotifHandler:        notificationsvc.NewHandler(deps),
-		BufModuleServer:     bufmodules.NewServer(deps),
-		BufCommitServer:     bufcommits.NewServer(deps),
-		BufUploadServer:     bufupload.NewServer(deps),
-		BufGraphServer:      bufgraph.NewServer(deps),
-		BufDownloadServer:   bufdownload.NewServer(deps),
-		BufAlphaAuthnServer: bufauthn.NewServer(deps),
-		GoProxyHandler:      goproxy.NewHandler(deps, c.Server.RegistryHost),
-		SDKBackend:          sdkBackend,
+		AuthorizationServer:    authorizationServer,
+		AuthServer:             authsvc.NewServer(deps),
+		ModuleServer:           module.NewServer(deps),
+		CommitHandler:          commitsvc.NewHandler(deps),
+		ContentHandler:         contentsvc.NewHandler(deps),
+		MetaHandler:            metasvc.NewHandler(deps),
+		IdentityHandler:        identitysvc.NewHandler(deps),
+		NotifHandler:           notificationsvc.NewHandler(deps),
+		BufModuleServer:        bufmodules.NewServer(deps),
+		BufCommitServer:        bufcommits.NewServer(deps),
+		BufUploadServer:        bufupload.NewServer(deps),
+		BufUploadV1Beta1Server: bufuploadv1beta1.NewServer(deps),
+		BufGraphServer:         bufgraph.NewServer(deps),
+		BufDownloadServer:      bufdownload.NewServer(deps),
+		BufAlphaAuthnServer:    bufauthn.NewServer(deps),
+		GoProxyHandler:         goproxy.NewHandler(deps, c.Server.RegistryHost),
+		SDKBackend:             sdkBackend,
 	}
 
 	return ss, nil

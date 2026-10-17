@@ -7,6 +7,7 @@ import (
 
 	registryv1alpha1connect "buf.build/gen/go/bufbuild/buf/connectrpc/go/buf/alpha/registry/v1alpha1/registryv1alpha1connect"
 	"buf.build/gen/go/bufbuild/registry/connectrpc/go/buf/registry/module/v1/modulev1connect"
+	modulev1beta1connect "buf.build/gen/go/bufbuild/registry/connectrpc/go/buf/registry/module/v1beta1/modulev1beta1connect"
 	"github.com/alipourhabibi/Hades/api/gen/api/auth/v1/authv1connect"
 	"github.com/alipourhabibi/Hades/api/gen/api/authorization/v1/authorizationv1connect"
 	identityv1connect "github.com/alipourhabibi/Hades/api/gen/api/identity/v1/identityv1connect"
@@ -107,6 +108,7 @@ func knownProcedures() map[string]bool {
 		modulev1connect.GraphServiceGetGraphProcedure,
 		modulev1connect.DownloadServiceDownloadProcedure,
 		modulev1connect.UploadServiceUploadProcedure,
+		modulev1beta1connect.UploadServiceUploadProcedure,
 		registryv1alpha1connect.AuthnServiceGetCurrentUserProcedure,
 		registryv1alpha1connect.AuthnServiceGetCurrentUserSubjectProcedure,
 	}

@@ -11,6 +11,7 @@ import (
 
 	registryv1alpha1connect "buf.build/gen/go/bufbuild/buf/connectrpc/go/buf/alpha/registry/v1alpha1/registryv1alpha1connect"
 	"buf.build/gen/go/bufbuild/registry/connectrpc/go/buf/registry/module/v1/modulev1connect"
+	modulev1beta1connect "buf.build/gen/go/bufbuild/registry/connectrpc/go/buf/registry/module/v1beta1/modulev1beta1connect"
 	"github.com/alipourhabibi/Hades/api/gen/api/auth/v1/authv1connect"
 	"github.com/alipourhabibi/Hades/api/gen/api/authorization/v1/authorizationv1connect"
 	identityv1connect "github.com/alipourhabibi/Hades/api/gen/api/identity/v1/identityv1connect"
@@ -140,6 +141,9 @@ func (s *SchemaRegistryServer) newServerMux() (*http.ServeMux, error) {
 	mux.Handle(modulev1connect.NewModuleServiceHandler(s.serverSet.BufModuleServer, withAuth))
 	mux.Handle(modulev1connect.NewCommitServiceHandler(s.serverSet.BufCommitServer, withAuth))
 	mux.Handle(modulev1connect.NewUploadServiceHandler(s.serverSet.BufUploadServer, withAuth))
+	// v1beta1 is what current buf CLI versions actually call for `buf push`;
+	// see bufuploadv1beta1's package doc for why both versions are mounted.
+	mux.Handle(modulev1beta1connect.NewUploadServiceHandler(s.serverSet.BufUploadV1Beta1Server, withAuth))
 	mux.Handle(modulev1connect.NewGraphServiceHandler(s.serverSet.BufGraphServer, withAuth))
 	mux.Handle(modulev1connect.NewDownloadServiceHandler(s.serverSet.BufDownloadServer, withAuth))
 	mux.Handle(registryv1alpha1connect.NewAuthnServiceHandler(s.serverSet.BufAlphaAuthnServer, withAuth))

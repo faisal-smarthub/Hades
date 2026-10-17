@@ -149,6 +149,7 @@ var sessionOnlyProcedures = map[string]bool{
 // handler, so anonymous `buf dep update` against public modules keeps working.
 var patOnlyProcedures = map[string]bool{
 	"/buf.registry.module.v1.UploadService/Upload":             true,
+	"/buf.registry.module.v1beta1.UploadService/Upload":        true,
 	"/buf.alpha.registry.v1alpha1.AuthnService/GetCurrentUser": true,
 }
 

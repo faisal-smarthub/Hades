@@ -8,6 +8,7 @@ import (
 
 	registryv1alpha1connect "buf.build/gen/go/bufbuild/buf/connectrpc/go/buf/alpha/registry/v1alpha1/registryv1alpha1connect"
 	"buf.build/gen/go/bufbuild/registry/connectrpc/go/buf/registry/module/v1/modulev1connect"
+	modulev1beta1connect "buf.build/gen/go/bufbuild/registry/connectrpc/go/buf/registry/module/v1beta1/modulev1beta1connect"
 	"github.com/alipourhabibi/Hades/api/gen/api/auth/v1/authv1connect"
 	"github.com/alipourhabibi/Hades/api/gen/api/authorization/v1/authorizationv1connect"
 	identityv1connect "github.com/alipourhabibi/Hades/api/gen/api/identity/v1/identityv1connect"
@@ -158,6 +159,7 @@ func matrix() []policyRow {
 		{modulev1connect.GraphServiceGetGraphProcedure, credOptional, guardOPA, ""},
 		{modulev1connect.DownloadServiceDownloadProcedure, credOptional, guardOPA, ""},
 		{modulev1connect.UploadServiceUploadProcedure, credPAT, guardOPA, "module:push per module, batched; PAT-only so a stolen browser session cannot push"},
+		{modulev1beta1connect.UploadServiceUploadProcedure, credPAT, guardOPA, "the v1beta1 Upload RPC current buf CLI versions actually call for `buf push`; same handler as the v1 adapter above, so it carries the same policy"},
 		{modulev1connect.ModuleServiceListModulesProcedure, credAny, guardUnimplemented, "not implemented by the adapter, so it carries no interceptor exemption: an exemption would describe a method that does not exist"},
 		{modulev1connect.ModuleServiceCreateModulesProcedure, credAny, guardUnimplemented, "native CreateModuleByName is the supported route"},
 		{modulev1connect.ModuleServiceUpdateModulesProcedure, credAny, guardUnimplemented, "native UpdateModule is the supported route"},
@@ -227,6 +229,7 @@ func TestEveryWriteToARegistryResourceAsksThePolicyEngine(t *testing.T) {
 		modulev1connect.GraphServiceGetGraphProcedure,
 		modulev1connect.DownloadServiceDownloadProcedure,
 		modulev1connect.UploadServiceUploadProcedure,
+		modulev1beta1connect.UploadServiceUploadProcedure,
 	}
 
 	byProcedure := map[string]policyRow{}
