@@ -135,6 +135,7 @@ const ModuleWizard: React.FC<ModuleWizardProps> = ({ onClose, onCreated }) => {
       const res = await rpcFetch<{ module?: { name?: string } }>(
         '/hades.api.registry.v1.ModuleService/CreateModuleByName',
         {
+          owner,
           name,
           visibility: visibility === 'private' ? 'MODULE_VISIBILITY_PRIVATE' : 'MODULE_VISIBILITY_PUBLIC',
           description,
