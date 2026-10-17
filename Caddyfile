@@ -2,6 +2,19 @@
     # Caddy obtains a TLS certificate from Let's Encrypt automatically.
     # Port 80 must be reachable from the internet for the HTTP-01 challenge.
 
+    # Prefer config/prod.yaml's auth.firstUserOnlySignup instead of this: it
+    # closes signup automatically after the first account, no manual step
+    # needed. See DEPLOYMENT.md "Disabling signup".
+    #
+    # This block is a defense-in-depth / edge-level alternative to that flag.
+    # Create your own account first, THEN uncomment the two lines below and
+    # run `docker compose restart caddy` to close signup to everyone else.
+    # The frontend's signup page will still render (it's a static route) but
+    # submitting it will get a 403 from this block.
+    #
+    # @disabledRegister path /hades.api.auth.v1.AuthenticationService/Register
+    # respond @disabledRegister 403
+
     @rpc path /hades.api.* /buf.registry.* /buf.alpha.* /gen/go/* /go/*
     reverse_proxy @rpc hades:50051 {
         transport http {

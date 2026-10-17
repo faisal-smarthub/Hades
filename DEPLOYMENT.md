@@ -17,35 +17,49 @@ cd Hades
 
 **2. Edit `config/prod.yaml`:**
 
-Two fields are required:
+One field is required:
 
 ```yaml
 server:
   registryHost: "yourdomain.com"   # your domain
-
-totp:
-  encryptionKey: "<64-char hex>"   # generate: openssl rand -hex 32
 ```
 
-Everything else in `config/prod.yaml` is pre-configured for the Docker Compose stack (Postgres, Gitaly, Redis all use the internal Docker network; SDK artifacts go to local disk, not S3).
+Everything else in `config/prod.yaml` is pre-configured for the Docker Compose stack (Postgres, Gitaly, Redis all use the internal Docker network; SDK artifacts go to local disk, not S3). The TOTP encryption key is supplied via environment variable in step 3, not here.
 
-**3. Create the data directories and start:**
+**3. Create a `.env` file:**
+
+Compose loads `.env` from the project directory automatically. Two variables matter:
+
+```bash
+cat > .env <<EOF
+DOMAIN=yourdomain.com
+HADES_TOTP_ENCRYPTION_KEY=$(openssl rand -hex 32)
+EOF
+```
+
+`HADES_TOTP_ENCRYPTION_KEY` is required — `docker-compose.yml` has no default for it and will refuse to start the `hades` service without it. `DOMAIN` defaults to `example.com`, which is wrong for a real deployment (it feeds both Caddy's cert request and the frontend's public URL), so set it explicitly.
+
+`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` default to `hades`/`hades`/`hades`; add them to `.env` too if you want to change them (see "Optional: change credentials" below).
+
+**4. Create the data directories and fix ownership:**
 
 All state (Postgres, Gitaly repositories, SDK artifacts, Caddy's certs) is
 bind-mounted under `./data` rather than named Docker volumes, specifically so
 the whole service is one directory tree a backup tool like `restic` can point
-at directly. The `hades` container runs as a non-root user (uid `10001`), so
-its artifact directory needs to be writable by that uid before first start:
+at directly. Two of these containers run as non-root users, so their
+directories need to be writable by those uids before first start — otherwise
+`gitaly` fails with `mkdir: can't create directory '/var/lib/gitlab/repositories': Permission denied`:
 
 ```bash
 mkdir -p data/postgres data/gitaly data/artifacts data/caddy/data data/caddy/config
-sudo chown -R 10001:10001 data/artifacts
+sudo chown -R 1000:1000 data/gitaly      # alpinelinux/gitaly image runs as uid 1000 (git)
+sudo chown -R 10001:10001 data/artifacts # hades image runs as uid 10001
 ```
 
 Then:
 
 ```bash
-DOMAIN=yourdomain.com docker compose up -d
+docker compose up -d
 ```
 
 That's it. Caddy automatically obtains a TLS certificate from Let's Encrypt on first start.
@@ -65,6 +79,34 @@ That's it. Caddy automatically obtains a TLS certificate from Let's Encrypt on f
 SDK artifact storage uses the `disk` backend (`backends.artifactStorage: disk`
 in `config/prod.yaml`), writing into the `hades` container's
 `./data/artifacts` bind mount — no S3/MinIO dependency.
+
+## Disabling signup
+
+Hades has no admin-UI toggle for this, but `config/prod.yaml` has an
+`auth.firstUserOnlySignup` flag. Set it to `true` only after you've created
+your own account:
+
+```yaml
+auth:
+  firstUserOnlySignup: true
+```
+
+```bash
+docker compose restart hades
+```
+
+From that point, `Register` succeeds only while the instance has zero
+accounts — your account already exists, so every signup after this is
+rejected with `PermissionDenied`, automatically, with no further action
+needed. Flip it back to `false` and restart `hades` if you ever want to open
+signup again.
+
+The frontend's `/signup` page still renders either way (it's a static
+route); only submitting it is affected.
+
+As a defense-in-depth alternative (or if you'd rather block it at the edge
+instead of touching backend config), `Caddyfile` has the same thing
+commented out as a reverse-proxy rule — see the comment above `@rpc` there.
 
 ## Backups
 

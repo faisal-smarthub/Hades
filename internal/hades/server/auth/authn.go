@@ -50,7 +50,37 @@ func (s *Server) totpRequired(ctx context.Context, userID string) bool {
 	return row.Enabled
 }
 
+// signupAllowed reports whether Register may create an account.
+//
+// With FirstUserOnlySignup unset this is always true: the default, open
+// signup. With it set, it is true only until the first account exists, so
+// a self-hosted single-admin deployment closes signup permanently right
+// after that account is created, with no further action needed.
+//
+// This races a concurrent registration against the first account's own
+// creation: both can observe zero users and both can be created before
+// either commits. That window exists only once, at the very first boot
+// before any account exists to race against, and is not worth a
+// serialising transaction to close.
+func (s *Server) signupAllowed(ctx context.Context) (bool, error) {
+	if !s.authCfg.FirstUserOnlySignup {
+		return true, nil
+	}
+	existing, err := s.userStorage.List(ctx, "", 1, 0)
+	if err != nil {
+		return false, err
+	}
+	return len(existing) == 0, nil
+}
+
 func (s *Server) Register(ctx context.Context, in *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {
+	if allowed, err := s.signupAllowed(ctx); err != nil {
+		s.logger.Error("failed to check signup eligibility", "error", err, "procedure", "Register")
+		return nil, connerr.Internal("failed to process registration")
+	} else if !allowed {
+		return nil, connerr.PermissionDenied("signup is disabled")
+	}
+
 	username := strings.ToLower(strings.TrimSpace(in.Msg.Username))
 	emailAddr := strings.ToLower(strings.TrimSpace(in.Msg.Email))
 

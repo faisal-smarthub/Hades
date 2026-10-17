@@ -89,6 +89,7 @@ auth:
     tokenExpiryHours: 24
   passwordReset:
     tokenExpiryHours: 1
+  firstUserOnlySignup: false
 
 email:
   stub: true

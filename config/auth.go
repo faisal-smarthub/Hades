@@ -8,6 +8,14 @@ type AuthConfig struct {
 	Lockout           LockoutConfig       `json:"lockout" yaml:"lockout"`
 	EmailVerification EmailVerifConfig    `json:"emailVerification" yaml:"emailVerification"`
 	PasswordReset     PasswordResetConfig `json:"passwordReset" yaml:"passwordReset"`
+	// FirstUserOnlySignup, once true, allows Register to succeed only while no
+	// user account exists yet. The first account created closes signup
+	// permanently (until this is set back to false) with no further action
+	// needed, which suits a single-admin deployment where self-service signup
+	// is never wanted again after bootstrap.
+	//
+	// False by default: open signup, the behaviour before this flag existed.
+	FirstUserOnlySignup bool `json:"firstUserOnlySignup" yaml:"firstUserOnlySignup"`
 }
 
 type PasswordConfig struct {

@@ -115,6 +115,11 @@ auth:
     autoVerify: false
   passwordReset:
     tokenExpiryHours: 1
+  # Once true, Register succeeds only while no account exists yet: the first
+  # one closes signup permanently (until this is set back to false), with no
+  # restart-free toggle or scheduled task needed. Suits a single-admin
+  # deployment that never wants self-service signup again after bootstrap.
+  firstUserOnlySignup: false
 
 email:
   stub: true # set to false and configure SMTP for real email delivery

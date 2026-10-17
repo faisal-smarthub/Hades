@@ -100,6 +100,9 @@ auth:
     tokenExpiryHours: 24
   passwordReset:
     tokenExpiryHours: 1
+  # Set to true after creating your own account to close signup permanently.
+  # See DEPLOYMENT.md "Disabling signup".
+  firstUserOnlySignup: false
 
 email:
   stub: true # set to false and configure SMTP for real email delivery
