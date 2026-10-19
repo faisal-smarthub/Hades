@@ -150,6 +150,7 @@ var sessionOnlyProcedures = map[string]bool{
 var patOnlyProcedures = map[string]bool{
 	"/buf.registry.module.v1.UploadService/Upload":             true,
 	"/buf.registry.module.v1beta1.UploadService/Upload":        true,
+	"/buf.registry.module.v1.ModuleService/CreateModules":      true,
 	"/buf.alpha.registry.v1alpha1.AuthnService/GetCurrentUser": true,
 }
 

@@ -11,10 +11,10 @@ import (
 )
 
 // Mounting buf's ModuleService exposes its whole method set, but this adapter
-// implements only GetModules. The struct used to embed the bare handler
-// interface, which is nil, so calling any of the others dereferenced a nil
-// interface and panicked. ListModules is reachable without a credential, so
-// that was an unauthenticated remote panic.
+// implements only GetModules and CreateModules. The struct used to embed the
+// bare handler interface, which is nil, so calling any of the others
+// dereferenced a nil interface and panicked. ListModules is reachable without
+// a credential, so that was an unauthenticated remote panic.
 //
 // These call the methods the adapter does not implement and require an
 // Unimplemented status instead.
@@ -25,10 +25,6 @@ func TestUnimplementedProceduresReturnUnimplemented(t *testing.T) {
 	cases := map[string]func() error{
 		"ListModules": func() error {
 			_, err := s.ListModules(ctx, connect.NewRequest(&modulev1.ListModulesRequest{}))
-			return err
-		},
-		"CreateModules": func() error {
-			_, err := s.CreateModules(ctx, connect.NewRequest(&modulev1.CreateModulesRequest{}))
 			return err
 		},
 		"UpdateModules": func() error {

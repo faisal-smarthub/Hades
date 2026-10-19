@@ -161,7 +161,7 @@ func matrix() []policyRow {
 		{modulev1connect.UploadServiceUploadProcedure, credPAT, guardOPA, "module:push per module, batched; PAT-only so a stolen browser session cannot push"},
 		{modulev1beta1connect.UploadServiceUploadProcedure, credPAT, guardOPA, "the v1beta1 Upload RPC current buf CLI versions actually call for `buf push`; same handler as the v1 adapter above, so it carries the same policy"},
 		{modulev1connect.ModuleServiceListModulesProcedure, credAny, guardUnimplemented, "not implemented by the adapter, so it carries no interceptor exemption: an exemption would describe a method that does not exist"},
-		{modulev1connect.ModuleServiceCreateModulesProcedure, credAny, guardUnimplemented, "native CreateModuleByName is the supported route"},
+		{modulev1connect.ModuleServiceCreateModulesProcedure, credPAT, guardOPA, "module:create per module, like CreateModuleByName; PAT-only so `buf push --create` can't be driven by a stolen browser session — this is what lets a new service's first CI push auto-create its module"},
 		{modulev1connect.ModuleServiceUpdateModulesProcedure, credAny, guardUnimplemented, "native UpdateModule is the supported route"},
 		{modulev1connect.ModuleServiceDeleteModulesProcedure, credAny, guardUnimplemented, "module deletion is not implemented anywhere"},
 		{modulev1connect.CommitServiceListCommitsProcedure, credAny, guardUnimplemented, "not implemented by the adapter; see ModuleService/ListModules"},
@@ -230,6 +230,7 @@ func TestEveryWriteToARegistryResourceAsksThePolicyEngine(t *testing.T) {
 		modulev1connect.DownloadServiceDownloadProcedure,
 		modulev1connect.UploadServiceUploadProcedure,
 		modulev1beta1connect.UploadServiceUploadProcedure,
+		modulev1connect.ModuleServiceCreateModulesProcedure,
 	}
 
 	byProcedure := map[string]policyRow{}

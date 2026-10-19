@@ -204,7 +204,6 @@ func (s *Server) GetModule(ctx context.Context, in *connect.Request[registrypbv1
 }
 
 func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[registrypbv1.CreateModuleByNameRequest]) (*connect.Response[registrypbv1.CreateModuleByNameResponse], error) {
-
 	in.Msg.Name = strings.ToLower(strings.TrimSpace(in.Msg.Name))
 	// Before any storage or git call. The module name becomes the second
 	// segment of every URL the module appears at and the second segment of its
@@ -224,25 +223,113 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 		return nil, connerr.Unauthenticated("not authenticated")
 	}
 
-	// The namespace defaults to the caller's own username. Naming an
-	// organisation here creates the module in that org's namespace, which the
-	// OPA check below then authorises: org membership grants bindings over
-	// "<org>/*", so no policy change is needed to support it.
-	ownerName := strings.ToLower(strings.TrimSpace(in.Msg.Owner))
-	if ownerName == "" {
-		ownerName = user.Username
-	}
-	ownerID := user.Id
-	if ownerName != user.Username {
-		org, err := s.orgDBStorage.GetByName(ctx, ownerName)
-		if err != nil {
-			s.logger.Warn("module owner namespace not found", "procedure", "CreateModuleByName", "user_id", user.Id, "owner", ownerName)
-			return nil, connerr.NotFound("owner namespace not found")
-		}
-		ownerID = org.Id
+	ownerName, ownerID, err := s.resolveOwnerByName(ctx, user, in.Msg.Owner)
+	if err != nil {
+		return nil, err
 	}
 
-	moduleFullName := ownerName + "/" + in.Msg.Name
+	lintPreset := in.Msg.LintPreset
+	if lintPreset == registrypbv1.LintPreset_LINT_PRESET_UNSPECIFIED {
+		lintPreset = registrypbv1.LintPreset_LINT_PRESET_DEFAULT
+	}
+
+	module, err := s.createModule(ctx, user, createModuleParams{
+		ownerName:       ownerName,
+		ownerID:         ownerID,
+		name:            in.Msg.Name,
+		visibility:      in.Msg.Visibility,
+		description:     in.Msg.Description,
+		defaultBranch:   in.Msg.DefaultBranch,
+		lintPreset:      lintPreset,
+		breakingEnabled: in.Msg.BreakingEnabled,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &connect.Response[registrypbv1.CreateModuleByNameResponse]{
+		Msg: &registrypbv1.CreateModuleByNameResponse{
+			Module: module,
+		},
+	}, nil
+}
+
+// CreateModule creates a single module in ownerName's namespace. It is the
+// entry point for the buf.build CreateModules protocol adapter (which has no
+// single-request shape of its own — it batches several of these), sharing
+// the same validation, authorization, and creation path as CreateModuleByName.
+//
+// ownerName may name an organisation instead of defaulting to the caller: the
+// buf CLI's "--create" flow resolves the owner straight from the module's
+// configured full name (e.g. "smarthub" in "buf.smarthubai.net/smarthub/
+// infer-metricquery-svc"), so a service's protos land in the org's namespace
+// rather than the pushing user's personal one.
+func (s *Server) CreateModule(ctx context.Context, ownerName, name string, visibility registrypbv1.ModuleVisibility) (*registrypbv1.Module, error) {
+	user, ok := ctx.Value(constants.ContextKeyUser).(*identityv1.User)
+	if !ok {
+		s.logger.Error("missing user in context", "procedure", "CreateModule")
+		return nil, connerr.Unauthenticated("not authenticated")
+	}
+
+	name = strings.ToLower(strings.TrimSpace(name))
+	if err := constants.ValidateName(name); err != nil {
+		return nil, connerr.InvalidArgument("module " + err.Error())
+	}
+
+	resolvedOwnerName, ownerID, err := s.resolveOwnerByName(ctx, user, ownerName)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.createModule(ctx, user, createModuleParams{
+		ownerName:     resolvedOwnerName,
+		ownerID:       ownerID,
+		name:          name,
+		visibility:    visibility,
+		defaultBranch: "main",
+		lintPreset:    registrypbv1.LintPreset_LINT_PRESET_DEFAULT,
+	})
+}
+
+// resolveOwnerByName resolves an owner name to the namespace that will own a
+// module, defaulting to the caller's own username when ownerNameInput is
+// empty. Naming an organisation here creates the module in that org's
+// namespace, which the CREATE policy check in createModule then authorises:
+// org membership grants bindings over "<org>/*", so no policy change is
+// needed to support it.
+func (s *Server) resolveOwnerByName(ctx context.Context, user *identityv1.User, ownerNameInput string) (ownerName, ownerID string, err error) {
+	ownerName = strings.ToLower(strings.TrimSpace(ownerNameInput))
+	if ownerName == "" || ownerName == user.Username {
+		return user.Username, user.Id, nil
+	}
+	org, err := s.orgDBStorage.GetByName(ctx, ownerName)
+	if err != nil {
+		s.logger.Warn("module owner namespace not found", "procedure", "CreateModule", "user_id", user.Id, "owner", ownerName)
+		return "", "", connerr.NotFound("owner namespace not found")
+	}
+	return ownerName, org.Id, nil
+}
+
+// createModuleParams groups the inputs to createModule so both the native
+// CreateModuleByName RPC and the buf.build CreateModules protocol adapter can
+// share the same creation path.
+type createModuleParams struct {
+	ownerName       string
+	ownerID         string
+	name            string
+	visibility      registrypbv1.ModuleVisibility
+	description     string
+	defaultBranch   string
+	lintPreset      registrypbv1.LintPreset
+	breakingEnabled bool
+}
+
+// createModule runs the module-creation sequence shared by CreateModuleByName
+// and CreateModule: the CREATE policy check, the name-collision check, the
+// Gitaly repository and initial commit, and finally the DB transaction
+// recording the module and its first commit.
+func (s *Server) createModule(ctx context.Context, user *identityv1.User, p createModuleParams) (*registrypbv1.Module, error) {
+	moduleFullName := p.ownerName + "/" + p.name
 
 	can, err := s.authorization.Can(ctx, &constants.Policy{
 		Subject:      user.Username,
@@ -254,7 +341,7 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 		return nil, err
 	}
 	if !can.Allowed {
-		s.logger.Warn("user not allowed to create module", "procedure", "CreateModuleByName", "user_id", user.Id, "module", moduleFullName)
+		s.logger.Warn("user not allowed to create module", "procedure", "CreateModule", "user_id", user.Id, "module", moduleFullName)
 		return nil, connerr.PermissionDenied("user is not allowed to create this repo")
 	}
 
@@ -271,22 +358,16 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 	// The database constraint is still the authority: this is a check, not a
 	// lock, and two concurrent creates can both pass it. The one that loses
 	// gets AlreadyExists from connerr.FromDB inside the transaction below.
-	if existing, err := s.moduleDBStorage.GetModuleByOwnerAndName(ctx, ownerName, in.Msg.Name); err == nil && existing != nil {
+	if existing, err := s.moduleDBStorage.GetModuleByOwnerAndName(ctx, p.ownerName, p.name); err == nil && existing != nil {
 		return nil, connerr.AlreadyExists("module " + moduleFullName + " already exists")
 	}
-
-	lintPreset := in.Msg.LintPreset
-	if lintPreset == registrypbv1.LintPreset_LINT_PRESET_UNSPECIFIED {
-		lintPreset = registrypbv1.LintPreset_LINT_PRESET_DEFAULT
-	}
-	breakingEnabled := in.Msg.BreakingEnabled
 
 	bsrName := moduleFullName
 	if s.registryHost != "" {
 		bsrName = s.registryHost + "/" + moduleFullName
 	}
-	bufYAML := fmt.Sprintf("version: v2\nmodules:\n  - path: .\n    name: %s\nlint:\n  use:\n    - %s\n", bsrName, lintPresetToRule(lintPreset))
-	if breakingEnabled {
+	bufYAML := fmt.Sprintf("version: v2\nmodules:\n  - path: .\n    name: %s\nlint:\n  use:\n    - %s\n", bsrName, lintPresetToRule(p.lintPreset))
+	if p.breakingEnabled {
 		bufYAML += "breaking:\n  use:\n    - FILE\n"
 	}
 
@@ -311,7 +392,7 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 	// Compensation is saga-style: if any later step fails, the repository
 	// created in (1) is deleted. The pending gitalyOpLog entry written above
 	// lets the cleanup job compensate if the process dies mid-sequence.
-	if err := s.gitStorage.CreateRepository(ctx, moduleFullName, in.Msg.DefaultBranch); err != nil {
+	if err := s.gitStorage.CreateRepository(ctx, moduleFullName, p.defaultBranch); err != nil {
 		s.recordOpLogFailure(ctx, logID, err)
 		return nil, err
 	}
@@ -325,7 +406,7 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 	// something else raced us and PutFiles refuses rather than overwriting.
 	commitHash, err := s.gitStorage.PutFiles(ctx, gitstorage.PutFilesRequest{
 		RepoPath:    moduleFullName,
-		Branch:      in.Msg.DefaultBranch,
+		Branch:      p.defaultBranch,
 		Files:       gitFiles,
 		AuthorName:  user.Username,
 		AuthorEmail: user.Email,
@@ -348,15 +429,15 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 		module, err := s.moduleDBStorage.Create(
 			txCtx,
 			moduleFullName,
-			ownerID,
-			in.Msg.Visibility,
+			p.ownerID,
+			p.visibility,
 			registrypbv1.ModuleState_MODULE_STATE_ACTIVE,
-			in.Msg.Description,
+			p.description,
 			"",
 			"",
-			in.Msg.DefaultBranch,
-			lintPreset,
-			breakingEnabled,
+			p.defaultBranch,
+			p.lintPreset,
+			p.breakingEnabled,
 		)
 		if err != nil {
 			return nil, connerr.FromDB(err)
@@ -413,15 +494,11 @@ func (s *Server) CreateModuleByName(ctx context.Context, in *connect.Request[reg
 	module, ok := result.(*registrypbv1.Module)
 	if !ok {
 		s.logger.Error("unexpected result type from the create-module transaction",
-			"procedure", "CreateModuleByName", "module", moduleFullName)
+			"procedure", "CreateModule", "module", moduleFullName)
 		return nil, connerr.Internal("failed to create module")
 	}
 
-	return &connect.Response[registrypbv1.CreateModuleByNameResponse]{
-		Msg: &registrypbv1.CreateModuleByNameResponse{
-			Module: module,
-		},
-	}, nil
+	return module, nil
 }
 
 func (s *Server) UpdateModule(ctx context.Context, in *connect.Request[registrypbv1.UpdateModuleRequest]) (*connect.Response[registrypbv1.UpdateModuleResponse], error) {

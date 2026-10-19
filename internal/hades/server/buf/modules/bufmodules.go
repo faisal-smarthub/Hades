@@ -13,6 +13,7 @@ import (
 	"github.com/alipourhabibi/Hades/internal/buf/dto"
 	"github.com/alipourhabibi/Hades/internal/hades/server"
 	"github.com/alipourhabibi/Hades/internal/hades/server/module"
+	"github.com/alipourhabibi/Hades/utils/connerr"
 	"github.com/alipourhabibi/Hades/utils/log"
 )
 
@@ -20,6 +21,7 @@ import (
 // module.Server satisfies it; tests can provide a fake.
 type modulesProvider interface {
 	GetModules(ctx context.Context, refs []*registryv1.ModuleRef) ([]*registryv1.Module, error)
+	CreateModule(ctx context.Context, ownerName, name string, visibility registryv1.ModuleVisibility) (*registryv1.Module, error)
 }
 
 // Server is the buf.build protocol adapter for module queries.
@@ -56,5 +58,29 @@ func (s *Server) GetModules(ctx context.Context, req *connect.Request[modulev1.G
 
 	return &connect.Response[modulev1.GetModulesResponse]{
 		Msg: &modulev1.GetModulesResponse{Modules: responseModules},
+	}, nil
+}
+
+// CreateModules creates one or more modules, in request order. It is what
+// "buf push --create" calls when a module doesn't exist yet: each value's
+// OwnerRef names the namespace (a username or an organisation name) the new
+// module belongs to.
+func (s *Server) CreateModules(ctx context.Context, req *connect.Request[modulev1.CreateModulesRequest]) (*connect.Response[modulev1.CreateModulesResponse], error) {
+	created := make([]*modulev1.Module, 0, len(req.Msg.Values))
+	for _, v := range req.Msg.Values {
+		ownerName, ok := dto.OwnerNameFromRef(v.GetOwnerRef())
+		if !ok {
+			return nil, connerr.InvalidArgument("owner_ref must name an owner by name")
+		}
+
+		mod, err := s.handler.CreateModule(ctx, ownerName, v.GetName(), dto.FromBufModuleVisibility(v.GetVisibility()))
+		if err != nil {
+			return nil, err
+		}
+		created = append(created, dto.ToBufModulePB(mod))
+	}
+
+	return &connect.Response[modulev1.CreateModulesResponse]{
+		Msg: &modulev1.CreateModulesResponse{Modules: created},
 	}, nil
 }
