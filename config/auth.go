@@ -65,8 +65,8 @@ type SMTPConfig struct {
 }
 
 type OAuthConfig struct {
-	GitHub OAuthProvider `json:"github" yaml:"github"`
-	Google OAuthProvider `json:"google" yaml:"google"`
+	GitHub GitHubOAuthProvider `json:"github" yaml:"github"`
+	Google OAuthProvider       `json:"google" yaml:"google"`
 
 	// AllowAccountLinkingByEmail permits a first-time OAuth login to take over
 	// an existing local account whose email address matches the one the
@@ -84,6 +84,28 @@ type OAuthProvider struct {
 	ClientID     string `json:"clientId" yaml:"clientId"`
 	ClientSecret string `json:"clientSecret" yaml:"clientSecret"`
 	RedirectURL  string `json:"redirectUrl" yaml:"redirectUrl"`
+}
+
+// GitHubOAuthProvider is an OAuthProvider plus GitHub-only access controls.
+type GitHubOAuthProvider struct {
+	OAuthProvider `yaml:",inline"`
+
+	// AllowedOrgs, when non-empty, restricts GitHub login to accounts that are
+	// active members of at least one of these GitHub organisations. Membership
+	// is checked on every login, not only the first, so someone removed from
+	// the org can no longer sign in with GitHub. Sessions and API tokens they
+	// already hold are not revoked by this.
+	//
+	// Setting it adds the read:org scope to the GitHub authorization request.
+	// An org that restricts third-party application access must approve the
+	// OAuth app, or every membership check fails and nobody can sign in.
+	//
+	// It also lets members create accounts through GitHub while
+	// auth.firstUserOnlySignup keeps password signup closed: a login that has
+	// already passed an org check is not open signup.
+	//
+	// Empty by default: any GitHub account may sign in.
+	AllowedOrgs []string `json:"allowedOrgs" yaml:"allowedOrgs"`
 }
 
 type RedisConfig struct {

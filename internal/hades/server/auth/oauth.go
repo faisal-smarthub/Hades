@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -41,7 +42,7 @@ func (s *Server) oauth2Config(provider v1.OAuthProvider) (*oauth2.Config, error)
 			ClientSecret: s.oauthCfg.GitHub.ClientSecret,
 			RedirectURL:  s.oauthCfg.GitHub.RedirectURL,
 			Endpoint:     github.Endpoint,
-			Scopes:       []string{"user:email"},
+			Scopes:       gitHubScopes(s.oauthCfg.GitHub.AllowedOrgs),
 		}, nil
 	case v1.OAuthProvider_OAUTH_PROVIDER_GOOGLE:
 		return &oauth2.Config{
@@ -54,6 +55,16 @@ func (s *Server) oauth2Config(provider v1.OAuthProvider) (*oauth2.Config, error)
 	default:
 		return nil, connerr.InvalidArgument("unsupported OAuth provider")
 	}
+}
+
+// gitHubScopes returns the scopes to request from GitHub. read:org is asked for
+// only when an org allow-list needs it, so an unrestricted deployment does not
+// ask users for more access than it uses.
+func gitHubScopes(allowedOrgs []string) []string {
+	if len(allowedOrgs) == 0 {
+		return []string{"user:email"}
+	}
+	return []string{"user:email", "read:org"}
 }
 
 func providerName(p v1.OAuthProvider) string {
@@ -249,6 +260,20 @@ func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, email
 		return existing.Id, nil
 	}
 
+	// Creating an account here is signup, so FirstUserOnlySignup applies to it
+	// as it does to Register; without this check any GitHub or Google account
+	// could create one on an instance whose signup is closed. A GitHub login
+	// that has already passed an org allow-list check is exempt: the allow-list
+	// is the operator's own statement of who may have an account.
+	if !(pName == "github" && len(s.oauthCfg.GitHub.AllowedOrgs) > 0) {
+		if allowed, err := s.signupAllowed(ctx); err != nil {
+			s.logger.Error("failed to check signup eligibility", "error", err, "procedure", "OAuthCallback")
+			return "", connerr.Internal("failed to process login")
+		} else if !allowed {
+			return "", connerr.PermissionDenied("signup is disabled")
+		}
+	}
+
 	username, err := s.generateOAuthUsername(ctx, pName, providerUID)
 	if err != nil {
 		return "", err
@@ -327,7 +352,15 @@ func (s *Server) fetchProviderProfile(ctx context.Context, provider v1.OAuthProv
 	client.Timeout = 10 * time.Second
 	switch provider {
 	case v1.OAuthProvider_OAUTH_PROVIDER_GITHUB:
-		return fetchGitHubProfile(client)
+		uid, email, err := fetchGitHubProfile(client)
+		if err != nil {
+			return "", "", err
+		}
+		if err := requireGitHubOrgMembership(client, s.oauthCfg.GitHub.AllowedOrgs); err != nil {
+			s.logger.Warn("GitHub login refused by org allow-list", "error", err, "procedure", "OAuthCallback", "github_id", uid)
+			return "", "", err
+		}
+		return uid, email, nil
 	case v1.OAuthProvider_OAUTH_PROVIDER_GOOGLE:
 		return fetchGoogleProfile(client)
 	}
@@ -400,6 +433,58 @@ type googleUser struct {
 	Sub           string `json:"sub"`
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
+}
+
+type gitHubOrgMembership struct {
+	State string `json:"state"`
+}
+
+// requireGitHubOrgMembership returns nil when allowedOrgs is empty or the
+// token's user is an active member of at least one org in it.
+//
+// It asks /user/memberships/orgs/{org}, which needs read:org and reports
+// private memberships too, unlike the public /orgs/{org}/members listing. A
+// "pending" state is an invitation not yet accepted and does not count. GitHub
+// answers 404 for a non-member and 403 when the org has not approved this OAuth
+// app; both are a refusal, the second with a hint for the operator. Anything
+// else (a 5xx, a network failure) is reported as Unavailable, so a GitHub
+// outage is not mistaken for the user being outside the org.
+func requireGitHubOrgMembership(client *http.Client, allowedOrgs []string) error {
+	if len(allowedOrgs) == 0 {
+		return nil
+	}
+	appBlocked := false
+	for _, org := range allowedOrgs {
+		resp, err := client.Get("https://api.github.com/user/memberships/orgs/" + url.PathEscape(org))
+		if err != nil {
+			return connerr.Unavailable("GitHub organisation membership check failed")
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
+		if err != nil {
+			return connerr.Unavailable("GitHub organisation membership check failed")
+		}
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			continue
+		case resp.StatusCode == http.StatusForbidden:
+			appBlocked = true
+			continue
+		case resp.StatusCode < 200 || resp.StatusCode > 299:
+			return connerr.Unavailable("GitHub organisation membership check failed")
+		}
+		var m gitHubOrgMembership
+		if err := json.Unmarshal(body, &m); err != nil {
+			return connerr.Unavailable("GitHub organisation membership check failed")
+		}
+		if m.State == "active" {
+			return nil
+		}
+	}
+	if appBlocked {
+		return connerr.PermissionDenied("GitHub organisation membership could not be verified; the organisation may need to approve this application")
+	}
+	return connerr.PermissionDenied("GitHub account is not a member of an allowed organisation")
 }
 
 // fetchGoogleProfile returns the Google subject id and email, requiring that

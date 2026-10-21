@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -148,4 +149,122 @@ func TestFetchGoogleProfile_RejectsEmptySubject(t *testing.T) {
 
 	_, _, err := fetchGoogleProfile(client)
 	require.Error(t, err)
+}
+
+// stubOrgMemberships serves /user/memberships/orgs/{org} from a map of org to
+// status code and body. Orgs not in the map answer 404, as GitHub does for a
+// non-member. It records which orgs were asked about.
+func stubOrgMemberships(t *testing.T, responses map[string]struct {
+	status int
+	body   string
+}) (*http.Client, *[]string, func()) {
+	t.Helper()
+	var asked []string
+	client, closeFn := newStubProviderClient(t, func(w http.ResponseWriter, r *http.Request) {
+		org, ok := strings.CutPrefix(r.URL.Path, "/user/memberships/orgs/")
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		asked = append(asked, org)
+		resp, ok := responses[org]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(resp.status)
+		_, _ = w.Write([]byte(resp.body))
+	})
+	return client, &asked, closeFn
+}
+
+func TestRequireGitHubOrgMembership_EmptyAllowListAllowsAnyoneWithoutAsking(t *testing.T) {
+	client, asked, closeFn := stubOrgMemberships(t, nil)
+	defer closeFn()
+
+	require.NoError(t, requireGitHubOrgMembership(client, nil))
+	assert.Empty(t, *asked, "no membership request is needed without an allow-list")
+}
+
+func TestRequireGitHubOrgMembership_ActiveMemberIsAllowed(t *testing.T) {
+	client, _, closeFn := stubOrgMemberships(t, map[string]struct {
+		status int
+		body   string
+	}{
+		"smarthub": {http.StatusOK, `{"state": "active", "role": "member"}`},
+	})
+	defer closeFn()
+
+	require.NoError(t, requireGitHubOrgMembership(client, []string{"smarthub"}))
+}
+
+// Any one allowed org is enough; a 404 from an earlier org is not a failure.
+func TestRequireGitHubOrgMembership_MemberOfLaterOrgIsAllowed(t *testing.T) {
+	client, asked, closeFn := stubOrgMemberships(t, map[string]struct {
+		status int
+		body   string
+	}{
+		"second": {http.StatusOK, `{"state": "active"}`},
+	})
+	defer closeFn()
+
+	require.NoError(t, requireGitHubOrgMembership(client, []string{"first", "second"}))
+	assert.Equal(t, []string{"first", "second"}, *asked)
+}
+
+func TestRequireGitHubOrgMembership_NonMemberIsDenied(t *testing.T) {
+	client, _, closeFn := stubOrgMemberships(t, nil)
+	defer closeFn()
+
+	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+}
+
+// A pending membership is an invitation the user has not accepted.
+func TestRequireGitHubOrgMembership_PendingInvitationIsDenied(t *testing.T) {
+	client, _, closeFn := stubOrgMemberships(t, map[string]struct {
+		status int
+		body   string
+	}{
+		"smarthub": {http.StatusOK, `{"state": "pending"}`},
+	})
+	defer closeFn()
+
+	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+}
+
+// GitHub answers 403 when the org has not approved this OAuth app. That is
+// still a refusal, but its message must point the operator at the cause.
+func TestRequireGitHubOrgMembership_UnapprovedAppIsDeniedWithHint(t *testing.T) {
+	client, _, closeFn := stubOrgMemberships(t, map[string]struct {
+		status int
+		body   string
+	}{
+		"smarthub": {http.StatusForbidden, `{"message": "Although you appear to have the correct authorization credentials, the organization has enabled OAuth App access restrictions"}`},
+	})
+	defer closeFn()
+
+	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+	assert.Contains(t, err.Error(), "approve this application")
+}
+
+// A GitHub outage must not be reported as the user being outside the org.
+func TestRequireGitHubOrgMembership_ServerErrorIsUnavailable(t *testing.T) {
+	client, _, closeFn := stubOrgMemberships(t, map[string]struct {
+		status int
+		body   string
+	}{
+		"smarthub": {http.StatusBadGateway, ``},
+	})
+	defer closeFn()
+
+	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err))
+}
+
+func TestGitHubScopes_RequestsReadOrgOnlyWithAnAllowList(t *testing.T) {
+	assert.Equal(t, []string{"user:email"}, gitHubScopes(nil))
+	assert.Equal(t, []string{"user:email", "read:org"}, gitHubScopes([]string{"smarthub"}))
 }

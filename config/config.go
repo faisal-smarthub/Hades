@@ -70,6 +70,10 @@ func LoadFile(filename string) (*Config, error) {
 // envPattern matches ${VAR} and ${VAR:-default} references.
 var envPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}`)
 
+// gitHubLoginPattern matches a GitHub user or organisation login: 1 to 39
+// alphanumerics or hyphens, not starting or ending with a hyphen.
+var gitHubLoginPattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$`)
+
 // expandEnv substitutes ${VAR} and ${VAR:-default} references in the raw config
 // before it is parsed.
 //
@@ -140,7 +144,15 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("redis.addr is required when backends.cache is %q", CacheRedis)
 	}
 
-	for name, p := range map[string]OAuthProvider{"github": c.OAuth.GitHub, "google": c.OAuth.Google} {
+	for _, org := range c.OAuth.GitHub.AllowedOrgs {
+		// The name is interpolated into a GitHub API path, so anything that is
+		// not a valid org login is rejected rather than escaped.
+		if !gitHubLoginPattern.MatchString(org) {
+			return fmt.Errorf("oauth.github.allowedOrgs: %q is not a valid GitHub organisation name", org)
+		}
+	}
+
+	for name, p := range map[string]OAuthProvider{"github": c.OAuth.GitHub.OAuthProvider, "google": c.OAuth.Google} {
 		// A provider counts as configured once it has a client id. A redirect URL
 		// on its own is just a placeholder for a provider that is switched off,
 		// which is the normal state in the sample configs.
