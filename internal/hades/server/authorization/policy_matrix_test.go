@@ -147,6 +147,16 @@ func matrix() []policyRow {
 		{identityv1connect.OrgServiceUpdateOrgProcedure, credAny, guardOPA, "org:update on the org namespace"},
 		{identityv1connect.OrgServiceAddOrgMemberProcedure, credAny, guardOPA, "org:admin on the org namespace"},
 		{identityv1connect.OrgServiceRemoveOrgMemberProcedure, credAny, guardOPA, "org:admin, or the member removing themselves; last admin refused"},
+
+		// -- Instance administration. ----------------------------------------
+		// Superadmin only (opa.superAdmins or a runtime "superadmin" binding on
+		// "*"), and session-only so a leaked PAT cannot promote its owner or
+		// lock out the real administrators.
+		{identityv1connect.AdminServiceListUsersProcedure, credSession, guardOPA, "superadmin; returns email addresses, unlike UserService.ListUsers"},
+		{identityv1connect.AdminServiceSetUserStateProcedure, credSession, guardOPA, "superadmin; the caller's own account refused"},
+		{identityv1connect.AdminServiceDeleteUserProcedure, credSession, guardOPA, "superadmin; own account, configured superadmins and module owners refused"},
+		{identityv1connect.AdminServiceSetSuperadminProcedure, credSession, guardOPA, "superadmin; self-demotion and configured superadmins refused"},
+
 		{identityv1connect.NotificationServiceListNotificationsProcedure, credAny, guardSelf, ""},
 		{identityv1connect.NotificationServiceMarkNotificationReadProcedure, credAny, guardSelf, "update scoped by user id in SQL"},
 

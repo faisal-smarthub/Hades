@@ -136,6 +136,12 @@ var sessionOnlyProcedures = map[string]bool{
 	"/hades.api.auth.v1.OAuthService/ListLinkedProviders": true,
 	"/hades.api.auth.v1.OAuthService/UnlinkProvider":      true,
 	"/hades.api.auth.v1.AuditService/ListAuditLog":        true,
+	// Instance administration: a leaked PAT must not be able to promote its
+	// owner, demote or lock out the real administrators, or delete accounts.
+	"/hades.api.identity.v1.AdminService/ListUsers":     true,
+	"/hades.api.identity.v1.AdminService/SetUserState":  true,
+	"/hades.api.identity.v1.AdminService/DeleteUser":    true,
+	"/hades.api.identity.v1.AdminService/SetSuperadmin": true,
 }
 
 // patOnlyProcedures require a PAT (hades1_ token).

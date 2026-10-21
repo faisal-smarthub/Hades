@@ -49,6 +49,9 @@ type Engine struct {
 	store      *hybridStore
 	db         bindingStore
 	cache      cache.Cache
+	// configSuperAdmins is opa.superAdmins: fixed for the life of the process
+	// and not changeable through the API.
+	configSuperAdmins map[string]bool
 }
 
 // Option configures an Engine at construction time.
@@ -93,9 +96,13 @@ func newFromStore(ctx context.Context, db bindingStore, c cache.Cache, ttl time.
 	hs.logger = o.logger
 
 	e := &Engine{
-		store: hs,
-		db:    db,
-		cache: c,
+		store:             hs,
+		db:                db,
+		cache:             c,
+		configSuperAdmins: make(map[string]bool, len(o.superAdmins)),
+	}
+	for _, s := range o.superAdmins {
+		e.configSuperAdmins[s] = true
 	}
 
 	pq, err := newQuery(ctx, hs)
@@ -233,6 +240,65 @@ func (e *Engine) AddBinding(ctx context.Context, subject, role, domain string) e
 func (e *Engine) DeleteBinding(ctx context.Context, subject, domain string) error {
 	if err := e.db.DeleteBySubjectDomain(ctx, subject, domain); err != nil {
 		return err
+	}
+	return e.cache.Delete(ctx, bindingCacheKey(subject))
+}
+
+// superAdminDomain is the domain a runtime superadmin grant is bound to. The
+// policy's superadmin clause matches only this domain.
+const superAdminDomain = "*"
+
+// IsConfiguredSuperAdmin reports whether subject is listed in opa.superAdmins.
+func (e *Engine) IsConfiguredSuperAdmin(subject string) bool {
+	return e.configSuperAdmins[subject]
+}
+
+// HasSuperAdminGrant reports whether subject holds a runtime superadmin grant.
+// It reads the database, not the cache, so an admin screen never shows a
+// stale answer.
+func (e *Engine) HasSuperAdminGrant(ctx context.Context, subject string) (bool, error) {
+	bindings, err := e.db.ListBySubject(ctx, subject)
+	if err != nil {
+		return false, err
+	}
+	for _, b := range bindings {
+		if b.Role == constants.RoleSuperAdmin && b.Domain == superAdminDomain {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// GrantSuperAdmin gives subject a runtime superadmin grant. Granting twice is
+// a no-op.
+func (e *Engine) GrantSuperAdmin(ctx context.Context, subject string) error {
+	return e.AddBinding(ctx, subject, constants.RoleSuperAdmin, superAdminDomain)
+}
+
+// RevokeSuperAdmin removes subject's runtime superadmin grant. It cannot
+// remove a configured superadmin; see IsConfiguredSuperAdmin.
+func (e *Engine) RevokeSuperAdmin(ctx context.Context, subject string) error {
+	return e.DeleteBinding(ctx, subject, superAdminDomain)
+}
+
+// DeleteAllBindings removes every binding held by subject. Bindings are keyed
+// by username rather than by a foreign key, so deleting an account does not
+// cascade to them; left behind, they would pass to whoever next registers the
+// same name.
+func (e *Engine) DeleteAllBindings(ctx context.Context, subject string) error {
+	bindings, err := e.db.ListBySubject(ctx, subject)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]bool, len(bindings))
+	for _, b := range bindings {
+		if seen[b.Domain] {
+			continue
+		}
+		seen[b.Domain] = true
+		if err := e.db.DeleteBySubjectDomain(ctx, subject, b.Domain); err != nil {
+			return err
+		}
 	}
 	return e.cache.Delete(ctx, bindingCacheKey(subject))
 }

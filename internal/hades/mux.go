@@ -135,6 +135,7 @@ func (s *SchemaRegistryServer) newServerMux() (*http.ServeMux, error) {
 	mux.Handle(registryv1connect.NewSDKServiceHandler(s.serverSet.MetaHandler, withAuth))
 	mux.Handle(identityv1connect.NewUserServiceHandler(s.serverSet.IdentityHandler, withAuth))
 	mux.Handle(identityv1connect.NewOrgServiceHandler(s.serverSet.IdentityHandler, withAuth))
+	mux.Handle(identityv1connect.NewAdminServiceHandler(s.serverSet.AdminHandler, withAuth))
 	mux.Handle(identityv1connect.NewNotificationServiceHandler(s.serverSet.NotifHandler, withAuth))
 
 	// buf.build protocol adapters

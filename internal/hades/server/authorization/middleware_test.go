@@ -94,6 +94,10 @@ func knownProcedures() map[string]bool {
 		identityv1connect.OrgServiceUpdateOrgProcedure,
 		identityv1connect.OrgServiceAddOrgMemberProcedure,
 		identityv1connect.OrgServiceRemoveOrgMemberProcedure,
+		identityv1connect.AdminServiceListUsersProcedure,
+		identityv1connect.AdminServiceSetUserStateProcedure,
+		identityv1connect.AdminServiceDeleteUserProcedure,
+		identityv1connect.AdminServiceSetSuperadminProcedure,
 		identityv1connect.NotificationServiceListNotificationsProcedure,
 		identityv1connect.NotificationServiceMarkNotificationReadProcedure,
 

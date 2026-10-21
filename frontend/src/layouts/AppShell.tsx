@@ -78,6 +78,8 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isDark, setIsDark] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  // A display hint only: AdminService checks for itself.
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userPopupOpen, setUserPopupOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -97,10 +99,14 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Fetch current user on mount
   useEffect(() => {
-    const token = document.cookie.match(/hades_token=([^;]+)/)?.[1];
-    if (!token) return;
-    rpcFetch<{ user: UserInfo }>('/hades.api.authorization.v1.Authorization/UserBySession', {})
-      .then(data => { if (data?.user) setUserInfo(data.user); })
+    // hades_token is HttpOnly, so it cannot be read here to decide this; the
+    // check used to look for it and, never finding it, never fetched.
+    if (!isSignedIn()) return;
+    rpcFetch<{ user: UserInfo; isSuperadmin?: boolean }>('/hades.api.authorization.v1.Authorization/UserBySession', {})
+      .then(data => {
+        if (data?.user) setUserInfo(data.user);
+        setIsSuperadmin(!!data?.isSuperadmin);
+      })
       .catch(() => {});
   }, []);
 
@@ -238,6 +244,9 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Bottom nav (auth-only) */}
         {isAuthenticated && (
           <div style={{ borderTop: '1px solid var(--c-border)', padding: '8px 8px 6px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {isSuperadmin && (
+              <NavItem to="/admin/users" label="Users" icon={<IconUser size={15}/>} collapsed={collapsed} active={pathname === '/admin/users'}/>
+            )}
             {BOTTOM_NAV.map(item => (
               <NavItem key={item.to} {...item} collapsed={collapsed} active={pathname === item.to}/>
             ))}

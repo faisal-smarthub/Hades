@@ -13,6 +13,7 @@ import (
 	authorizationengine "github.com/alipourhabibi/Hades/internal/hades/authorization"
 	"github.com/alipourhabibi/Hades/internal/hades/cache"
 	"github.com/alipourhabibi/Hades/internal/hades/server"
+	adminsvc "github.com/alipourhabibi/Hades/internal/hades/server/admin"
 	authsvc "github.com/alipourhabibi/Hades/internal/hades/server/auth"
 	"github.com/alipourhabibi/Hades/internal/hades/server/authorization"
 	"github.com/alipourhabibi/Hades/internal/hades/server/buf/authn"
@@ -61,6 +62,7 @@ type SchemaRegistryServerSet struct {
 	ContentHandler         *contentsvc.Handler
 	MetaHandler            *metasvc.Handler
 	IdentityHandler        *identitysvc.Handler
+	AdminHandler           *adminsvc.Handler
 	NotifHandler           *notificationsvc.Handler
 	BufModuleServer        *bufmodules.Server
 	BufCommitServer        *bufcommits.Server
@@ -199,6 +201,7 @@ func NewServer(ctx context.Context, c *config.Config) (*SchemaRegistryServer, er
 		ContentHandler:         contentsvc.NewHandler(deps),
 		MetaHandler:            metasvc.NewHandler(deps),
 		IdentityHandler:        identitysvc.NewHandler(deps),
+		AdminHandler:           adminsvc.NewHandler(deps),
 		NotifHandler:           notificationsvc.NewHandler(deps),
 		BufModuleServer:        bufmodules.NewServer(deps),
 		BufCommitServer:        bufcommits.NewServer(deps),

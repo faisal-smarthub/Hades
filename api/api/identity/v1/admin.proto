@@ -1,0 +1,124 @@
+// Instance administration for the Hades schema registry.
+//
+// Every RPC here is restricted to superadmins: the subjects listed in
+// opa.superAdmins in the server configuration, and accounts promoted at
+// runtime with SetSuperadmin. Every RPC also requires an interactive session
+// (hds_sess_); a personal API token is refused, so a token leaked from a CI log
+// cannot be used to promote itself or lock other people out.
+
+syntax = "proto3";
+
+package hades.api.identity.v1;
+
+import "api/identity/v1/user.proto";
+import "buf/validate/validate.proto";
+
+option go_package = "gen/api/identity/v1";
+
+// AdminUser is a personal account as an administrator sees it.
+message AdminUser {
+  // The account record, including its email address and state.
+  User user = 1;
+  // Whether the account is a superadmin, by either route.
+  bool superadmin = 2;
+  // Whether the superadmin status comes from opa.superAdmins in the server
+  // configuration. Such a status cannot be removed with SetSuperadmin.
+  bool superadmin_from_config = 3;
+  // Number of modules the account owns. An account that owns modules cannot be
+  // deleted.
+  int32 module_count = 4;
+}
+
+// AdminServiceListUsersRequest searches personal accounts.
+message AdminServiceListUsersRequest {
+  // Optional substring search on username, matched literally.
+  string query = 1;
+  // Maximum number of accounts to return. Zero uses the default (50) and the
+  // server clamps to 100.
+  int32 page_size = 2;
+  // Opaque cursor from a previous response's next_page_token.
+  string page_token = 3;
+}
+
+// AdminServiceListUsersResponse carries matching accounts.
+message AdminServiceListUsersResponse {
+  repeated AdminUser users = 1;
+  // Cursor for the next page, or empty when this was the last one.
+  string next_page_token = 2;
+}
+
+// SetUserStateRequest activates or deactivates an account.
+message SetUserStateRequest {
+  // The account to change.
+  string username = 1 [(buf.validate.field).string.min_len = 1];
+  // USER_STATE_ACTIVE or USER_STATE_DEACTIVATED.
+  UserState state = 2 [(buf.validate.field).enum = {
+    in: [
+      1,
+      2
+    ]
+  }];
+}
+
+// SetUserStateResponse carries the updated account.
+message SetUserStateResponse {
+  AdminUser user = 1;
+}
+
+// DeleteUserRequest permanently removes an account.
+message DeleteUserRequest {
+  // The account to delete.
+  string username = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// DeleteUserResponse is empty.
+message DeleteUserResponse {}
+
+// SetSuperadminRequest promotes an account to superadmin or demotes it.
+message SetSuperadminRequest {
+  // The account to change.
+  string username = 1 [(buf.validate.field).string.min_len = 1];
+  // True to promote, false to demote.
+  bool superadmin = 2;
+}
+
+// SetSuperadminResponse carries the updated account.
+message SetSuperadminResponse {
+  AdminUser user = 1;
+}
+
+// AdminService manages the accounts on this instance.
+//
+// Every RPC returns PERMISSION_DENIED unless the caller is a superadmin. An
+// administrator cannot deactivate, delete or demote their own account, which
+// keeps an instance from being left with no one able to administer it by a
+// slip of the hand.
+service AdminService {
+  // ListUsers returns personal accounts with their state, email address and
+  // superadmin status. Organization accounts are excluded.
+  rpc ListUsers(AdminServiceListUsersRequest) returns (AdminServiceListUsersResponse);
+
+  // SetUserState activates or deactivates an account. A deactivated account
+  // cannot sign in, and its existing sessions and API tokens stop working at
+  // once; reactivating it restores them if they have not expired.
+  //
+  // Returns NOT_FOUND for an unknown account and FAILED_PRECONDITION for the
+  // caller's own account.
+  rpc SetUserState(SetUserStateRequest) returns (SetUserStateResponse);
+
+  // DeleteUser permanently removes an account, with its sessions, API tokens,
+  // organization memberships and permissions.
+  //
+  // Returns NOT_FOUND for an unknown account and FAILED_PRECONDITION for the
+  // caller's own account or an account that still owns modules, which would
+  // otherwise be deleted with it.
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+
+  // SetSuperadmin promotes an account to superadmin or demotes it. Promoting
+  // grants every permission on the instance, including this service.
+  //
+  // Returns NOT_FOUND for an unknown account, and FAILED_PRECONDITION when
+  // demoting the caller's own account, a deactivated account being promoted,
+  // or an account whose superadmin status comes from the server configuration.
+  rpc SetSuperadmin(SetSuperadminRequest) returns (SetSuperadminResponse);
+}

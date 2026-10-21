@@ -107,9 +107,16 @@ func (s *Server) UserBySession(ctx context.Context, in *connect.Request[v1.UserB
 		return nil, connerr.Unauthenticated("not authenticated")
 	}
 
+	isSuperAdmin, err := s.IsSuperAdmin(ctx, user.Username)
+	if err != nil {
+		s.logger.Error("failed to check superadmin status", "error", err, "procedure", "UserBySession", "subject", user.Username)
+		return nil, connerr.Unavailable("authorization service unavailable")
+	}
+
 	return &connect.Response[v1.UserBySessionResponse]{
 		Msg: &v1.UserBySessionResponse{
-			User: user,
+			User:         user,
+			IsSuperadmin: isSuperAdmin,
 		},
 	}, nil
 }
@@ -134,6 +141,37 @@ func (s *Server) AddOrgMemberBinding(ctx context.Context, subject, role, orgName
 // DeleteOrgBinding removes all bindings for subject within the org namespace.
 func (s *Server) DeleteOrgBinding(ctx context.Context, subject, orgName string) error {
 	return s.engine.DeleteBinding(ctx, subject, orgName+"/*")
+}
+
+// IsSuperAdmin reports whether subject is a superadmin, either listed in
+// opa.superAdmins or promoted at runtime.
+func (s *Server) IsSuperAdmin(ctx context.Context, subject string) (bool, error) {
+	if s.engine.IsConfiguredSuperAdmin(subject) {
+		return true, nil
+	}
+	return s.engine.HasSuperAdminGrant(ctx, subject)
+}
+
+// IsConfiguredSuperAdmin reports whether subject is listed in opa.superAdmins,
+// a status the API cannot change.
+func (s *Server) IsConfiguredSuperAdmin(subject string) bool {
+	return s.engine.IsConfiguredSuperAdmin(subject)
+}
+
+// GrantSuperAdmin promotes subject to superadmin.
+func (s *Server) GrantSuperAdmin(ctx context.Context, subject string) error {
+	return s.engine.GrantSuperAdmin(ctx, subject)
+}
+
+// RevokeSuperAdmin removes subject's runtime superadmin grant.
+func (s *Server) RevokeSuperAdmin(ctx context.Context, subject string) error {
+	return s.engine.RevokeSuperAdmin(ctx, subject)
+}
+
+// DeleteAllBindings removes every role binding subject holds. Used when the
+// account is deleted.
+func (s *Server) DeleteAllBindings(ctx context.Context, subject string) error {
+	return s.engine.DeleteAllBindings(ctx, subject)
 }
 
 // Scopes describes what a credential is permitted to do.
