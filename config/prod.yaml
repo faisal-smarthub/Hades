@@ -117,6 +117,11 @@ oauth:
     clientId: ""
     clientSecret: ""
     redirectUrl: "https://example.com/oauth/github/callback"
+    # GitHub organisations whose active members may sign in with GitHub. Empty
+    # allows any GitHub account. Checked on every login; adds the read:org
+    # scope, and an org with third-party app restrictions must approve the app.
+    # Members may create accounts even with auth.firstUserOnlySignup set.
+    allowedOrgs: []
   google:
     clientId: ""
     clientSecret: ""
