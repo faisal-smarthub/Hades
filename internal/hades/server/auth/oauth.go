@@ -34,27 +34,36 @@ const oauthStateTTL = 10 * time.Minute
 // oauthStateKey is the cache key under which an issued state is recorded.
 func oauthStateKey(state string) string { return "oauth:state:" + state }
 
+// oauth2Config returns the client config for provider, or FailedPrecondition
+// when the operator has not configured that provider. Without the check an
+// unconfigured provider still produced an authorization URL with an empty
+// client_id, which sent the user to an error page on the provider's site.
 func (s *Server) oauth2Config(provider v1.OAuthProvider) (*oauth2.Config, error) {
+	var cfg *oauth2.Config
 	switch provider {
 	case v1.OAuthProvider_OAUTH_PROVIDER_GITHUB:
-		return &oauth2.Config{
+		cfg = &oauth2.Config{
 			ClientID:     s.oauthCfg.GitHub.ClientID,
 			ClientSecret: s.oauthCfg.GitHub.ClientSecret,
 			RedirectURL:  s.oauthCfg.GitHub.RedirectURL,
 			Endpoint:     github.Endpoint,
 			Scopes:       gitHubScopes(s.oauthCfg.GitHub.AllowedOrgs),
-		}, nil
+		}
 	case v1.OAuthProvider_OAUTH_PROVIDER_GOOGLE:
-		return &oauth2.Config{
+		cfg = &oauth2.Config{
 			ClientID:     s.oauthCfg.Google.ClientID,
 			ClientSecret: s.oauthCfg.Google.ClientSecret,
 			RedirectURL:  s.oauthCfg.Google.RedirectURL,
 			Endpoint:     google.Endpoint,
 			Scopes:       []string{"openid", "email", "profile"},
-		}, nil
+		}
 	default:
 		return nil, connerr.InvalidArgument("unsupported OAuth provider")
 	}
+	if cfg.ClientID == "" {
+		return nil, connerr.FailedPrecondition("sign-in with " + providerName(provider) + " is not configured on this server")
+	}
+	return cfg, nil
 }
 
 // gitHubScopes returns the scopes to request from GitHub. read:org is asked for
@@ -174,7 +183,7 @@ func (s *Server) OAuthCallback(ctx context.Context, in *connect.Request[v1.OAuth
 		return nil, connerr.Unauthenticated("OAuth token exchange failed")
 	}
 
-	providerUID, emailAddr, err := s.fetchProviderProfile(ctx, in.Msg.Provider, oauthToken)
+	providerUID, emailAddr, providerLogin, err := s.fetchProviderProfile(ctx, in.Msg.Provider, oauthToken)
 	if err != nil {
 		return nil, err
 	}
@@ -188,9 +197,14 @@ func (s *Server) OAuthCallback(ctx context.Context, in *connect.Request[v1.OAuth
 
 	pName := providerName(in.Msg.Provider)
 
-	userID, err := s.resolveOAuthUser(ctx, pName, providerUID, emailAddr)
+	userID, err := s.resolveOAuthUser(ctx, pName, providerUID, emailAddr, providerLogin)
 	if err != nil {
 		return nil, err
+	}
+	user, err := s.userStorage.GetByID(ctx, userID)
+	if err != nil {
+		s.logger.Error("failed to load OAuth user", "error", err, "procedure", "OAuthCallback", "user_id", userID)
+		return nil, connerr.FromDB(err)
 	}
 
 	fullToken, tokenHash, err := utilscrypto.GenerateToken(utilscrypto.SessionTokenPrefix)
@@ -220,15 +234,17 @@ func (s *Server) OAuthCallback(ctx context.Context, in *connect.Request[v1.OAuth
 				Token:       fullToken,
 				PendingTotp: s.totpRequired(ctx, userID),
 			},
+			Username: user.GetUsername(),
 		},
 	}, nil
 }
 
 // resolveOAuthUser maps a verified provider identity to a Hades user id,
-// creating the account on first login. Account creation, email verification and
+// creating the account on first login, named after providerLogin where that
+// is possible (see generateOAuthUsername). Account creation, email verification and
 // the initial role binding happen in one transaction so a partial account can
 // never survive.
-func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, emailAddr string) (string, error) {
+func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, emailAddr, providerLogin string) (string, error) {
 	if identity, err := s.oauthIdentityDB.GetByProviderUID(ctx, pName, providerUID); err == nil {
 		return identity.UserID, nil
 	}
@@ -275,7 +291,7 @@ func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, email
 		}
 	}
 
-	username, err := s.generateOAuthUsername(ctx, pName, providerUID)
+	username, err := s.generateOAuthUsername(ctx, pName, providerUID, providerLogin)
 	if err != nil {
 		return "", err
 	}
@@ -321,13 +337,25 @@ func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, email
 // The naive "<provider>_<uid>" form skips the reserved-name check that
 // Register applies and has no collision recovery, so a clash surfaces as an
 // opaque unique-violation from inside a transaction. Both are handled here.
-func (s *Server) generateOAuthUsername(ctx context.Context, pName, providerUID string) (string, error) {
+func (s *Server) generateOAuthUsername(ctx context.Context, pName, providerUID, providerLogin string) (string, error) {
+	// The provider's own login comes first, so a GitHub user keeps the same
+	// name here. It is used only when it is a valid Hades name and nobody
+	// holds it yet: a taken name belongs to someone else, and handing its
+	// owner's account to a provider login that merely matches it would be an
+	// account takeover. Those fall through to the "<provider>_<uid>" form.
+	var candidates []string
+	if login := strings.ToLower(providerLogin); login != "" && constants.ValidateName(login) == nil {
+		candidates = append(candidates, login)
+	}
 	base := strings.ToLower(fmt.Sprintf("%s_%s", pName, providerUID))
 	for attempt := 0; attempt < 10; attempt++ {
-		candidate := base
-		if attempt > 0 {
-			candidate = fmt.Sprintf("%s_%d", base, attempt)
+		if attempt == 0 {
+			candidates = append(candidates, base)
+		} else {
+			candidates = append(candidates, fmt.Sprintf("%s_%d", base, attempt))
 		}
+	}
+	for _, candidate := range candidates {
 		if constants.IsReservedName(candidate) {
 			continue
 		}
@@ -348,24 +376,28 @@ func (s *Server) generateOAuthUsername(ctx context.Context, pName, providerUID s
 	return "", connerr.Internal("failed to create account")
 }
 
-func (s *Server) fetchProviderProfile(ctx context.Context, provider v1.OAuthProvider, token *oauth2.Token) (uid, email string, err error) {
+// fetchProviderProfile returns the provider's stable account id, its verified
+// email, and its login name where the provider has one (GitHub does, Google
+// does not).
+func (s *Server) fetchProviderProfile(ctx context.Context, provider v1.OAuthProvider, token *oauth2.Token) (uid, email, login string, err error) {
 	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
 	client.Timeout = 10 * time.Second
 	switch provider {
 	case v1.OAuthProvider_OAUTH_PROVIDER_GITHUB:
-		uid, email, err := fetchGitHubProfile(client)
+		uid, email, login, err := fetchGitHubProfile(client)
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
 		if err := requireGitHubOrgMembership(client, s.oauthCfg.GitHub.AllowedOrgs); err != nil {
 			s.logger.Warn("GitHub login refused by org allow-list", "error", err, "procedure", "OAuthCallback", "github_id", uid)
-			return "", "", err
+			return "", "", "", err
 		}
-		return uid, email, nil
+		return uid, email, login, nil
 	case v1.OAuthProvider_OAUTH_PROVIDER_GOOGLE:
-		return fetchGoogleProfile(client)
+		uid, email, err := fetchGoogleProfile(client)
+		return uid, email, "", err
 	}
-	return "", "", connerr.InvalidArgument("unsupported provider")
+	return "", "", "", connerr.InvalidArgument("unsupported provider")
 }
 
 // getJSON performs a GET and decodes a 2xx JSON body into out. A non-2xx
@@ -402,32 +434,32 @@ type gitHubEmail struct {
 	Verified bool   `json:"verified"`
 }
 
-// fetchGitHubProfile returns the GitHub account id and its primary verified
-// email address.
+// fetchGitHubProfile returns the GitHub account id, its primary verified email
+// address, and its login (the GitHub username).
 //
 // The email is read from /user/emails, never from /user. The email on /user is
 // the public profile field, which any account can set to an address it does not
 // own; trusting it would let an attacker claim another user's Hades account by
 // email match.
-func fetchGitHubProfile(client *http.Client) (uid, email string, err error) {
+func fetchGitHubProfile(client *http.Client) (uid, email, login string, err error) {
 	var u gitHubUser
 	if err := getJSON(client, "https://api.github.com/user", &u); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if u.ID == 0 {
-		return "", "", connerr.Unauthenticated("GitHub profile is missing an account id")
+		return "", "", "", connerr.Unauthenticated("GitHub profile is missing an account id")
 	}
 
 	var emails []gitHubEmail
 	if err := getJSON(client, "https://api.github.com/user/emails", &emails); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	for _, e := range emails {
 		if e.Primary && e.Verified && e.Email != "" {
-			return fmt.Sprintf("%d", u.ID), e.Email, nil
+			return fmt.Sprintf("%d", u.ID), e.Email, u.Login, nil
 		}
 	}
-	return "", "", connerr.Unauthenticated("GitHub account has no primary verified email address")
+	return "", "", "", connerr.Unauthenticated("GitHub account has no primary verified email address")
 }
 
 type googleUser struct {

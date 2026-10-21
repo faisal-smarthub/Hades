@@ -11,6 +11,7 @@ import Btn from '@/components/ui/Button';
 import { IconShield, IconAlert, IconEye } from '@/components/icons';
 import Badge from '@/components/ui/Badge';
 import { useSignupEnabled } from '@/lib/useSignupEnabled';
+import { startOAuth, type OAuthProviderName } from '@/lib/oauth';
 
 const GitHubIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -27,6 +28,7 @@ export default function PageLogin() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [oauthPending, setOAuthPending] = useState<OAuthProviderName | null>(null);
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -41,6 +43,18 @@ export default function PageLogin() {
       setError(formatError(e));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // On success the browser navigates away to the provider, so the busy state
+  // is only cleared on failure.
+  const signInWith = async (provider: OAuthProviderName) => {
+    setError(''); setOAuthPending(provider);
+    try {
+      await startOAuth(provider);
+    } catch (e) {
+      setError(formatError(e));
+      setOAuthPending(null);
     }
   };
 
@@ -94,11 +108,11 @@ export default function PageLogin() {
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 14px', borderRadius: 6, border: '1px solid var(--c-border)', background: 'var(--c-bg-inset)', color: 'var(--c-fg)', fontFamily: 'inherit', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-              <GitHubIcon/>GitHub
+            <button type="button" onClick={() => signInWith('github')} disabled={oauthPending !== null} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 14px', borderRadius: 6, border: '1px solid var(--c-border)', background: 'var(--c-bg-inset)', color: 'var(--c-fg)', fontFamily: 'inherit', fontSize: 13, fontWeight: 500, cursor: oauthPending ? 'wait' : 'pointer' }}>
+              <GitHubIcon/>{oauthPending === 'github' ? 'Redirecting…' : 'GitHub'}
             </button>
-            <button style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 14px', borderRadius: 6, border: '1px solid var(--c-border)', background: 'var(--c-bg-inset)', color: 'var(--c-fg)', fontFamily: 'inherit', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-              Google
+            <button type="button" onClick={() => signInWith('google')} disabled={oauthPending !== null} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 14px', borderRadius: 6, border: '1px solid var(--c-border)', background: 'var(--c-bg-inset)', color: 'var(--c-fg)', fontFamily: 'inherit', fontSize: 13, fontWeight: 500, cursor: oauthPending ? 'wait' : 'pointer' }}>
+              {oauthPending === 'google' ? 'Redirecting…' : 'Google'}
             </button>
           </div>
         </Card>

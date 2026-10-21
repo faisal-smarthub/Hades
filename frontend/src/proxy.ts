@@ -8,7 +8,9 @@ import type { NextRequest } from 'next/server';
 // /login and /signup are exempted because they're what establishes a
 // session in the first place, and /verify-email/* because that link is
 // opened from an email client in whatever browser the user has, not
-// necessarily a logged-in one. The matcher below already excludes /api/*
+// necessarily a logged-in one. /oauth/* is where GitHub and Google send the
+// browser back after sign-in, which is necessarily before a session exists.
+// The matcher below already excludes /api/*
 // (the proxy routes /login and /signup themselves call to reach the
 // backend) and /oauth2/* (the buf CLI's own token exchange, authenticated
 // by its own Bearer header rather than a browser cookie).
@@ -16,7 +18,7 @@ const PUBLIC_PATHS = new Set(['/login', '/signup']);
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith('/verify-email/')) {
+  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith('/verify-email/') || pathname.startsWith('/oauth/')) {
     return NextResponse.next();
   }
 
