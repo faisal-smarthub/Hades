@@ -16,6 +16,40 @@ type AuthConfig struct {
 	//
 	// False by default: open signup, the behaviour before this flag existed.
 	FirstUserOnlySignup bool `json:"firstUserOnlySignup" yaml:"firstUserOnlySignup"`
+	// AutoJoinOrgs adds every newly created account, whether registered with a
+	// password or created by a first OAuth login, to these organisations. The
+	// membership is written in the same transaction as the account, so an
+	// account never exists without it. Accounts that already exist are not
+	// touched; add them with OrgService.AddOrgMember.
+	//
+	// An organisation that does not exist is logged and skipped rather than
+	// failing the signup: a typo here should not lock everyone out.
+	AutoJoinOrgs []AutoJoinOrg `json:"autoJoinOrgs" yaml:"autoJoinOrgs"`
+}
+
+// AutoJoinOrg is one organisation that new accounts join automatically.
+type AutoJoinOrg struct {
+	// Org is the Hades organisation name.
+	Org string `json:"org" yaml:"org"`
+	// Role is "reader" (read-only access to the org's modules, the default) or
+	// "member" (read and push). Admin is deliberately not offered: granting
+	// org administration to anyone who can sign up is never what is meant.
+	Role string `json:"role" yaml:"role"`
+}
+
+// Auto-join roles. The org membership row records the role under these names;
+// "member" is the OPA contributor role, as in OrgService.AddOrgMember.
+const (
+	AutoJoinRoleReader = "reader"
+	AutoJoinRoleMember = "member"
+)
+
+// EffectiveRole returns Role, defaulting to reader.
+func (o AutoJoinOrg) EffectiveRole() string {
+	if o.Role == "" {
+		return AutoJoinRoleReader
+	}
+	return o.Role
 }
 
 type PasswordConfig struct {

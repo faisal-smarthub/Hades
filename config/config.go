@@ -152,6 +152,15 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	for i, o := range c.Auth.AutoJoinOrgs {
+		if o.Org == "" {
+			return fmt.Errorf("auth.autoJoinOrgs[%d]: org is required", i)
+		}
+		if r := o.EffectiveRole(); r != AutoJoinRoleReader && r != AutoJoinRoleMember {
+			return fmt.Errorf("auth.autoJoinOrgs[%d]: role %q must be %q or %q", i, o.Role, AutoJoinRoleReader, AutoJoinRoleMember)
+		}
+	}
+
 	for name, p := range map[string]OAuthProvider{"github": c.OAuth.GitHub.OAuthProvider, "google": c.OAuth.Google} {
 		// A provider counts as configured once it has a client id. A redirect URL
 		// on its own is just a placeholder for a provider that is switched off,

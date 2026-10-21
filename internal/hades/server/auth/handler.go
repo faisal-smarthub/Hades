@@ -18,6 +18,7 @@ import (
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db/devicegrant"
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db/emailverification"
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db/oauthidentity"
+	orgdb "github.com/alipourhabibi/Hades/internal/hades/storage/db/org"
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db/passwordreset"
 	dbsession "github.com/alipourhabibi/Hades/internal/hades/storage/db/session"
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db/totpsecret"
@@ -53,6 +54,7 @@ type Server struct {
 	registryHost         string
 	apiTokenDB           apitoken.Storage
 	oauthIdentityDB      oauthidentity.Storage
+	orgStorage           orgdb.Storage
 	oauthCfg             config.OAuthConfig
 	deviceGrantDB        devicegrant.Storage
 	totpSecretDB         totpsecret.Storage
@@ -80,6 +82,7 @@ func NewServer(deps *server.Dependencies) *Server {
 		registryHost:         deps.RegistryHost,
 		apiTokenDB:           deps.APITokenDB,
 		oauthIdentityDB:      deps.OAuthIdentityDB,
+		orgStorage:           deps.OrgDB,
 		oauthCfg:             deps.OAuthConfig,
 		deviceGrantDB:        deps.DeviceGrantDB,
 		totpSecretDB:         deps.TOTPSecretDB,

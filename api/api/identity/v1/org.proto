@@ -89,9 +89,11 @@ message AddOrgMemberRequest {
   string org_name = 1 [(buf.validate.field).string.min_len = 1];
   // Username of the user to add.
   string username = 2 [(buf.validate.field).string.min_len = 1];
-  // Role to assign. Valid values: "member", "admin". Defaults to "member".
-  // "member" grants the contributor role over the org's namespace; "admin"
-  // additionally allows managing the org and its membership.
+  // Role to assign. Valid values: "reader", "member", "admin". Defaults to
+  // "member". "reader" grants read-only access to the org's modules; "member"
+  // grants the contributor role (read and push) over the org's namespace;
+  // "admin" additionally allows managing the org and its membership. Any other
+  // value is rejected with INVALID_ARGUMENT.
   string role = 3;
 }
 

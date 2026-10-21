@@ -103,6 +103,14 @@ auth:
   # Set to true after creating your own account to close signup permanently.
   # See DEPLOYMENT.md "Disabling signup".
   firstUserOnlySignup: false
+  # Organisations every newly created account (password signup or first
+  # OAuth login) joins automatically. role is "reader" (read-only, the
+  # default) or "member" (read and push). Existing accounts are not touched.
+  # A missing org is logged and skipped.
+  #   autoJoinOrgs:
+  #     - org: my-org
+  #       role: reader
+  autoJoinOrgs: []
 
 email:
   stub: true # set to false and configure SMTP for real email delivery

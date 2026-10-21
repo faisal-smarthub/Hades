@@ -411,10 +411,18 @@ func (h *Handler) AddOrgMember(ctx context.Context, in *connect.Request[registry
 	if memberRole == "" {
 		memberRole = "member"
 	}
-	// Map org "member" → OPA "contributor"; "admin" stays "admin".
-	opaRole := memberRole
-	if opaRole == "member" {
+	// Map org "member" → OPA "contributor"; "reader" and "admin" keep their
+	// names. Anything else is refused: the role used to be passed through
+	// unchecked, so "owner" was grantable by any org admin and a typo produced
+	// a member with a binding that granted nothing.
+	var opaRole string
+	switch memberRole {
+	case "member":
 		opaRole = constants.RoleContributor
+	case constants.RoleReader, constants.RoleAdmin:
+		opaRole = memberRole
+	default:
+		return nil, connerr.InvalidArgument(`role must be "reader", "member" or "admin"`)
 	}
 
 	// Membership row and OPA binding are written together: the two stores
