@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -156,6 +158,8 @@ func TestFetchGoogleProfile_RejectsEmptySubject(t *testing.T) {
 // stubOrgMemberships serves /user/memberships/orgs/{org} from a map of org to
 // status code and body. Orgs not in the map answer 404, as GitHub does for a
 // non-member. It records which orgs were asked about.
+var discardLogger = slog.New(slog.DiscardHandler)
+
 func stubOrgMemberships(t *testing.T, responses map[string]struct {
 	status int
 	body   string
@@ -184,7 +188,7 @@ func TestRequireGitHubOrgMembership_EmptyAllowListAllowsAnyoneWithoutAsking(t *t
 	client, asked, closeFn := stubOrgMemberships(t, nil)
 	defer closeFn()
 
-	require.NoError(t, requireGitHubOrgMembership(client, nil))
+	require.NoError(t, requireGitHubOrgMembership(client, nil, discardLogger))
 	assert.Empty(t, *asked, "no membership request is needed without an allow-list")
 }
 
@@ -197,7 +201,7 @@ func TestRequireGitHubOrgMembership_ActiveMemberIsAllowed(t *testing.T) {
 	})
 	defer closeFn()
 
-	require.NoError(t, requireGitHubOrgMembership(client, []string{"smarthub"}))
+	require.NoError(t, requireGitHubOrgMembership(client, []string{"smarthub"}, discardLogger))
 }
 
 // Any one allowed org is enough; a 404 from an earlier org is not a failure.
@@ -210,7 +214,7 @@ func TestRequireGitHubOrgMembership_MemberOfLaterOrgIsAllowed(t *testing.T) {
 	})
 	defer closeFn()
 
-	require.NoError(t, requireGitHubOrgMembership(client, []string{"first", "second"}))
+	require.NoError(t, requireGitHubOrgMembership(client, []string{"first", "second"}, discardLogger))
 	assert.Equal(t, []string{"first", "second"}, *asked)
 }
 
@@ -218,7 +222,7 @@ func TestRequireGitHubOrgMembership_NonMemberIsDenied(t *testing.T) {
 	client, _, closeFn := stubOrgMemberships(t, nil)
 	defer closeFn()
 
-	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	err := requireGitHubOrgMembership(client, []string{"smarthub"}, discardLogger)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 }
 
@@ -232,7 +236,7 @@ func TestRequireGitHubOrgMembership_PendingInvitationIsDenied(t *testing.T) {
 	})
 	defer closeFn()
 
-	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	err := requireGitHubOrgMembership(client, []string{"smarthub"}, discardLogger)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 }
 
@@ -247,7 +251,7 @@ func TestRequireGitHubOrgMembership_UnapprovedAppIsDeniedWithHint(t *testing.T) 
 	})
 	defer closeFn()
 
-	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	err := requireGitHubOrgMembership(client, []string{"smarthub"}, discardLogger)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 	assert.Contains(t, err.Error(), "approve this application")
 }
@@ -262,11 +266,30 @@ func TestRequireGitHubOrgMembership_ServerErrorIsUnavailable(t *testing.T) {
 	})
 	defer closeFn()
 
-	err := requireGitHubOrgMembership(client, []string{"smarthub"})
+	err := requireGitHubOrgMembership(client, []string{"smarthub"}, discardLogger)
 	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err))
 }
 
 func TestGitHubScopes_RequestsReadOrgOnlyWithAnAllowList(t *testing.T) {
 	assert.Equal(t, []string{"user:email"}, gitHubScopes(nil))
 	assert.Equal(t, []string{"user:email", "read:org"}, gitHubScopes([]string{"smarthub"}))
+}
+
+func TestRequireGitHubOrgMembership_LogsWhatGitHubAnswered(t *testing.T) {
+	client, closeFn := newStubProviderClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-OAuth-Scopes", "user:email")
+		w.Header().Set("X-Accepted-OAuth-Scopes", "read:org")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+	})
+	defer closeFn()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+
+	err := requireGitHubOrgMembership(client, []string{"smarthub"}, logger)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+	out := buf.String()
+	for _, want := range []string{"org=smarthub", "status=404", `github_message="Not Found"`, "token_scopes=user:email", "accepted_scopes=read:org"} {
+		assert.Contains(t, out, want)
+	}
 }

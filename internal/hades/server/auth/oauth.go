@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -388,7 +389,7 @@ func (s *Server) fetchProviderProfile(ctx context.Context, provider v1.OAuthProv
 		if err != nil {
 			return "", "", "", err
 		}
-		if err := requireGitHubOrgMembership(client, s.oauthCfg.GitHub.AllowedOrgs); err != nil {
+		if err := requireGitHubOrgMembership(client, s.oauthCfg.GitHub.AllowedOrgs, s.logger.Logger); err != nil {
 			s.logger.Warn("GitHub login refused by org allow-list", "error", err, "procedure", "OAuthCallback", "github_id", uid)
 			return "", "", "", err
 		}
@@ -470,6 +471,8 @@ type googleUser struct {
 
 type gitHubOrgMembership struct {
 	State string `json:"state"`
+	// Message is GitHub's error text on a non-2xx answer.
+	Message string `json:"message"`
 }
 
 // requireGitHubOrgMembership returns nil when allowedOrgs is empty or the
@@ -482,7 +485,13 @@ type gitHubOrgMembership struct {
 // app; both are a refusal, the second with a hint for the operator. Anything
 // else (a 5xx, a network failure) is reported as Unavailable, so a GitHub
 // outage is not mistaken for the user being outside the org.
-func requireGitHubOrgMembership(client *http.Client, allowedOrgs []string) error {
+//
+// Every answer that does not admit the user is logged with GitHub's status,
+// message and the scopes the token actually carries (X-OAuth-Scopes): the
+// error returned to the browser deliberately says nothing about why, and a 404
+// looks the same whether the user is outside the org or the token cannot see
+// it.
+func requireGitHubOrgMembership(client *http.Client, allowedOrgs []string, logger *slog.Logger) error {
 	if len(allowedOrgs) == 0 {
 		return nil
 	}
@@ -497,6 +506,17 @@ func requireGitHubOrgMembership(client *http.Client, allowedOrgs []string) error
 		if err != nil {
 			return connerr.Unavailable("GitHub organisation membership check failed")
 		}
+		var m gitHubOrgMembership
+		decodeErr := json.Unmarshal(body, &m)
+		if resp.StatusCode != http.StatusOK || m.State != "active" {
+			logger.Warn("GitHub organisation membership not confirmed",
+				"org", org,
+				"status", resp.StatusCode,
+				"state", m.State,
+				"github_message", m.Message,
+				"token_scopes", resp.Header.Get("X-OAuth-Scopes"),
+				"accepted_scopes", resp.Header.Get("X-Accepted-OAuth-Scopes"))
+		}
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
 			continue
@@ -506,8 +526,7 @@ func requireGitHubOrgMembership(client *http.Client, allowedOrgs []string) error
 		case resp.StatusCode < 200 || resp.StatusCode > 299:
 			return connerr.Unavailable("GitHub organisation membership check failed")
 		}
-		var m gitHubOrgMembership
-		if err := json.Unmarshal(body, &m); err != nil {
+		if decodeErr != nil {
 			return connerr.Unavailable("GitHub organisation membership check failed")
 		}
 		if m.State == "active" {
