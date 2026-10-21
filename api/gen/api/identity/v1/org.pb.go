@@ -514,9 +514,11 @@ type AddOrgMemberRequest struct {
 	OrgName string `protobuf:"bytes,1,opt,name=org_name,json=orgName,proto3" json:"org_name,omitempty"`
 	// Username of the user to add.
 	Username string `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
-	// Role to assign. Valid values: "member", "admin". Defaults to "member".
-	// "member" grants the contributor role over the org's namespace; "admin"
-	// additionally allows managing the org and its membership.
+	// Role to assign. Valid values: "reader", "member", "admin". Defaults to
+	// "member". "reader" grants read-only access to the org's modules; "member"
+	// grants the contributor role (read and push) over the org's namespace;
+	// "admin" additionally allows managing the org and its membership. Any other
+	// value is rejected with INVALID_ARGUMENT.
 	Role          string `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

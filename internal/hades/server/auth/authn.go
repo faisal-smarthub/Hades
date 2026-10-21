@@ -168,7 +168,10 @@ func (s *Server) Register(ctx context.Context, in *connect.Request[v1.RegisterRe
 			return nil, connerr.FromDB(err)
 		}
 		userID = user.Id
-		return nil, s.authorizationService.AddBasicRoles(ctx, username)
+		if err := s.authorizationService.AddBasicRoles(ctx, username); err != nil {
+			return nil, err
+		}
+		return nil, s.joinAutoJoinOrgs(ctx, userID, username, "Register")
 	}, 15*time.Second)
 	if err != nil {
 		return nil, err

@@ -100,3 +100,35 @@ func TestValidateRejectsInvalidGitHubAllowedOrgs(t *testing.T) {
 		})
 	}
 }
+
+// Admin is deliberately not an auto-join role, and an empty org name is a
+// config mistake, not "no org".
+func TestValidateAutoJoinOrgs(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		entry config.AutoJoinOrg
+		valid bool
+	}{
+		{"default role", config.AutoJoinOrg{Org: "smarthub"}, true},
+		{"reader", config.AutoJoinOrg{Org: "smarthub", Role: "reader"}, true},
+		{"member", config.AutoJoinOrg{Org: "smarthub", Role: "member"}, true},
+		{"admin", config.AutoJoinOrg{Org: "smarthub", Role: "admin"}, false},
+		{"owner", config.AutoJoinOrg{Org: "smarthub", Role: "owner"}, false},
+		{"no org", config.AutoJoinOrg{Role: "reader"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.LoadFile("container.yaml")
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			cfg.Auth.AutoJoinOrgs = []config.AutoJoinOrg{tc.entry}
+			err = cfg.Validate()
+			if tc.valid && err != nil {
+				t.Fatalf("%+v must be accepted: %v", tc.entry, err)
+			}
+			if !tc.valid && err == nil {
+				t.Fatalf("%+v must be rejected", tc.entry)
+			}
+		})
+	}
+}

@@ -278,6 +278,40 @@ func TestAddOrgMember_RequiresAdminAndGrantsABinding(t *testing.T) {
 	assert.False(t, del.Allowed)
 }
 
+func TestAddOrgMember_ReaderCanReadButNotPush(t *testing.T) {
+	f := newFixture(t)
+	org := f.mustCreateOrg(t, "acme")
+	require.NoError(t, f.addMember(t, "bob", "reader"))
+
+	role, err := f.env.DB.Org().GetMemberRole(context.Background(), org.Id, f.bob.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "reader", role)
+
+	read, err := f.authz.Can(ctxFor(f.bob), &constants.Policy{
+		Subject: "bob", ResourceType: "module", Action: "read", Domain: "acme/thing", Visibility: "private",
+	})
+	require.NoError(t, err)
+	assert.True(t, read.Allowed, "a reader can read the org's private modules")
+
+	push, err := f.authz.Can(ctxFor(f.bob), &constants.Policy{
+		Subject: "bob", ResourceType: "module", Action: "push", Domain: "acme/thing",
+	})
+	require.NoError(t, err)
+	assert.False(t, push.Allowed, "a reader cannot push")
+}
+
+func TestAddOrgMember_UnknownRoleIsRefused(t *testing.T) {
+	// The role used to be passed through unchecked, so an org admin could hand
+	// out "owner" and a typo produced a member whose binding granted nothing.
+	f := newFixture(t)
+	f.mustCreateOrg(t, "acme")
+
+	for _, role := range []string{"owner", "superadmin", "contributor", "Reader"} {
+		err := f.addMember(t, "bob", role)
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "role %q", role)
+	}
+}
+
 func TestAddOrgMember_UnknownUserIsNotFound(t *testing.T) {
 	f := newFixture(t)
 	f.mustCreateOrg(t, "acme")

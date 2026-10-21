@@ -313,6 +313,9 @@ func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, email
 		if err := s.oauthIdentityDB.Create(txCtx, newUser.Id, pName, providerUID, emailAddr); err != nil {
 			return nil, connerr.FromDB(err)
 		}
+		if err := s.joinAutoJoinOrgs(txCtx, newUser.Id, username, "OAuthCallback"); err != nil {
+			return nil, err
+		}
 		return newUser.Id, nil
 	}, 15*time.Second)
 	if err != nil {
