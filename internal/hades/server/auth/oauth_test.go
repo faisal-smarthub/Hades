@@ -52,10 +52,11 @@ func TestFetchGitHubProfile_UsesVerifiedPrimaryEmail(t *testing.T) {
 	})
 	defer closeFn()
 
-	uid, email, err := fetchGitHubProfile(client)
+	uid, email, login, err := fetchGitHubProfile(client)
 
 	require.NoError(t, err)
 	assert.Equal(t, "4242", uid)
+	assert.Equal(t, "alice", login)
 	// The profile email must be ignored: any GitHub account can set it to an
 	// address it does not own, which would allow claiming another Hades account.
 	assert.Equal(t, "real@example.com", email)
@@ -72,7 +73,7 @@ func TestFetchGitHubProfile_RejectsUnverifiedPrimaryEmail(t *testing.T) {
 	})
 	defer closeFn()
 
-	_, _, err := fetchGitHubProfile(client)
+	_, _, _, err := fetchGitHubProfile(client)
 
 	require.Error(t, err)
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
@@ -88,11 +89,12 @@ func TestFetchGitHubProfile_RejectsNonOKStatus(t *testing.T) {
 	})
 	defer closeFn()
 
-	uid, email, err := fetchGitHubProfile(client)
+	uid, email, login, err := fetchGitHubProfile(client)
 
 	require.Error(t, err)
 	assert.Empty(t, uid)
 	assert.Empty(t, email)
+	assert.Empty(t, login)
 }
 
 func TestFetchGitHubProfile_RejectsZeroAccountID(t *testing.T) {
@@ -101,7 +103,7 @@ func TestFetchGitHubProfile_RejectsZeroAccountID(t *testing.T) {
 	})
 	defer closeFn()
 
-	_, _, err := fetchGitHubProfile(client)
+	_, _, _, err := fetchGitHubProfile(client)
 	require.Error(t, err)
 }
 

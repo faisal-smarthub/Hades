@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	authv1 "github.com/alipourhabibi/Hades/api/gen/api/auth/v1"
 	"github.com/alipourhabibi/Hades/config"
 	authorizationengine "github.com/alipourhabibi/Hades/internal/hades/authorization"
 	"github.com/alipourhabibi/Hades/internal/hades/cache"
@@ -51,10 +53,10 @@ func TestResolveOAuthUser_FirstUserOnlySignupClosesOAuthSignup(t *testing.T) {
 			srv := newOAuthSignupServer(t, config.OAuthConfig{})
 			ctx := context.Background()
 
-			_, err := srv.resolveOAuthUser(ctx, provider, "1001", "first@example.com")
+			_, err := srv.resolveOAuthUser(ctx, provider, "1001", "first@example.com", "")
 			require.NoError(t, err, "the first account may still be created through OAuth")
 
-			_, err = srv.resolveOAuthUser(ctx, provider, "1002", "second@example.com")
+			_, err = srv.resolveOAuthUser(ctx, provider, "1002", "second@example.com", "")
 			assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "signup must be closed once an account exists")
 		})
 	}
@@ -66,10 +68,10 @@ func TestResolveOAuthUser_LinkedIdentityStillLogsInWhenSignupClosed(t *testing.T
 	srv := newOAuthSignupServer(t, config.OAuthConfig{})
 	ctx := context.Background()
 
-	first, err := srv.resolveOAuthUser(ctx, "github", "1001", "first@example.com")
+	first, err := srv.resolveOAuthUser(ctx, "github", "1001", "first@example.com", "")
 	require.NoError(t, err)
 
-	again, err := srv.resolveOAuthUser(ctx, "github", "1001", "first@example.com")
+	again, err := srv.resolveOAuthUser(ctx, "github", "1001", "first@example.com", "")
 	require.NoError(t, err)
 	assert.Equal(t, first, again)
 }
@@ -83,13 +85,110 @@ func TestResolveOAuthUser_GitHubOrgAllowListBypassesClosedSignup(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	_, err := srv.resolveOAuthUser(ctx, "github", "1001", "first@example.com")
+	_, err := srv.resolveOAuthUser(ctx, "github", "1001", "first@example.com", "")
 	require.NoError(t, err)
 
-	_, err = srv.resolveOAuthUser(ctx, "github", "1002", "second@example.com")
+	_, err = srv.resolveOAuthUser(ctx, "github", "1002", "second@example.com", "")
 	require.NoError(t, err, "an org-checked GitHub login must be able to create an account")
 
 	// The exemption is GitHub's alone: Google has no allow-list.
-	_, err = srv.resolveOAuthUser(ctx, "google", "2001", "third@example.com")
+	_, err = srv.resolveOAuthUser(ctx, "google", "2001", "third@example.com", "")
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+}
+
+// An unconfigured provider must be refused here, with a message the login page
+// can show, rather than produce a URL with an empty client_id that lands the
+// user on an error page at the provider.
+func TestGetOAuthURL_UnconfiguredProviderIsFailedPrecondition(t *testing.T) {
+	srv := newOAuthSignupServer(t, config.OAuthConfig{})
+
+	_, err := srv.GetOAuthURL(context.Background(), connect.NewRequest(&authv1.GetOAuthURLRequest{
+		Provider: authv1.OAuthProvider_OAUTH_PROVIDER_GITHUB,
+	}))
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
+}
+
+func TestGetOAuthURL_ConfiguredGitHubRequestsReadOrgWithAllowList(t *testing.T) {
+	srv := newOAuthSignupServer(t, config.OAuthConfig{
+		GitHub: config.GitHubOAuthProvider{
+			OAuthProvider: config.OAuthProvider{ClientID: "client-123", ClientSecret: "s", RedirectURL: "https://hades.example.com/oauth/github/callback"},
+			AllowedOrgs:   []string{"smarthub"},
+		},
+	})
+
+	resp, err := srv.GetOAuthURL(context.Background(), connect.NewRequest(&authv1.GetOAuthURLRequest{
+		Provider: authv1.OAuthProvider_OAUTH_PROVIDER_GITHUB,
+	}))
+	require.NoError(t, err)
+
+	u, err := url.Parse(resp.Msg.Url)
+	require.NoError(t, err)
+	q := u.Query()
+	assert.Equal(t, "github.com", u.Host)
+	assert.Equal(t, "client-123", q.Get("client_id"))
+	assert.Equal(t, "https://hades.example.com/oauth/github/callback", q.Get("redirect_uri"))
+	assert.Equal(t, "user:email read:org", q.Get("scope"))
+	assert.NotEmpty(t, q.Get("state"))
+}
+
+// usernameOf returns the username of the account resolveOAuthUser returned.
+func usernameOf(t *testing.T, srv *Server, userID string) string {
+	t.Helper()
+	u, err := srv.userStorage.GetByID(context.Background(), userID)
+	require.NoError(t, err)
+	return u.GetUsername()
+}
+
+// newOrgGatedServer is a server whose GitHub logins are org-checked, so they
+// may create accounts however many already exist.
+func newOrgGatedServer(t *testing.T) *Server {
+	return newOAuthSignupServer(t, config.OAuthConfig{
+		GitHub: config.GitHubOAuthProvider{AllowedOrgs: []string{"smarthub"}},
+	})
+}
+
+// A GitHub user's Hades account takes their GitHub username, lowercased the
+// way every Hades name is.
+func TestResolveOAuthUser_UsesGitHubLoginAsUsername(t *testing.T) {
+	srv := newOrgGatedServer(t)
+
+	id, err := srv.resolveOAuthUser(context.Background(), "github", "1001", "alice@example.com", "Alice-Dev")
+	require.NoError(t, err)
+	assert.Equal(t, "alice-dev", usernameOf(t, srv, id))
+}
+
+// A login that is already a Hades username belongs to someone else. The new
+// account must get the fallback name and must not be linked to the existing
+// one, which would hand that account to whoever holds the matching login.
+func TestResolveOAuthUser_TakenLoginFallsBackWithoutLinking(t *testing.T) {
+	srv := newOrgGatedServer(t)
+	ctx := context.Background()
+
+	first, err := srv.resolveOAuthUser(ctx, "github", "1001", "bob@example.com", "bob")
+	require.NoError(t, err)
+
+	second, err := srv.resolveOAuthUser(ctx, "github", "1002", "other-bob@example.com", "bob")
+	require.NoError(t, err)
+
+	assert.NotEqual(t, first, second)
+	assert.Equal(t, "bob", usernameOf(t, srv, first))
+	assert.Equal(t, "github_1002", usernameOf(t, srv, second))
+}
+
+// A login Hades cannot use as a name (reserved, here) also falls back.
+func TestResolveOAuthUser_ReservedLoginFallsBack(t *testing.T) {
+	srv := newOrgGatedServer(t)
+
+	id, err := srv.resolveOAuthUser(context.Background(), "github", "1001", "admin@example.com", "admin")
+	require.NoError(t, err)
+	assert.Equal(t, "github_1001", usernameOf(t, srv, id))
+}
+
+// Providers without a login keep the "<provider>_<uid>" form.
+func TestResolveOAuthUser_NoLoginUsesProviderID(t *testing.T) {
+	srv := newOAuthSignupServer(t, config.OAuthConfig{})
+
+	id, err := srv.resolveOAuthUser(context.Background(), "google", "2001", "g@example.com", "")
+	require.NoError(t, err)
+	assert.Equal(t, "google_2001", usernameOf(t, srv, id))
 }

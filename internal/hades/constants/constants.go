@@ -25,7 +25,7 @@ const (
 var reservedNames = map[string]struct{}{
 	"settings": {}, "login": {}, "signup": {}, "search": {},
 	"verify-email": {}, "api": {}, "app": {},
-	"go": {}, "gen": {}, "oauth2": {}, "buf": {}, "hades": {},
+	"go": {}, "gen": {}, "oauth": {}, "oauth2": {}, "buf": {}, "hades": {},
 	"admin": {}, "administrator": {}, "root": {}, "system": {},
 	"help": {}, "support": {}, "about": {}, "pricing": {},
 	"terms": {}, "privacy": {}, "security": {}, "status": {},

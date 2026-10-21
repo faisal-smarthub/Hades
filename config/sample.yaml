@@ -133,7 +133,7 @@ oauth:
   github:
     clientId: ""
     clientSecret: ""
-    redirectUrl: "http://localhost:50051/oauth/github/callback"
+    redirectUrl: "http://localhost:3000/oauth/github/callback"
     # GitHub organisations whose active members may sign in with GitHub. Empty
     # allows any GitHub account. Checked on every login; adds the read:org
     # scope, and an org with third-party app restrictions must approve the app.
@@ -142,7 +142,7 @@ oauth:
   google:
     clientId: ""
     clientSecret: ""
-    redirectUrl: "http://localhost:50051/oauth/google/callback"
+    redirectUrl: "http://localhost:3000/oauth/google/callback"
 
 redis:
   addr: "localhost:6379"
