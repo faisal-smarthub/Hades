@@ -265,7 +265,8 @@ func (s *Server) resolveOAuthUser(ctx context.Context, pName, providerUID, email
 	// could create one on an instance whose signup is closed. A GitHub login
 	// that has already passed an org allow-list check is exempt: the allow-list
 	// is the operator's own statement of who may have an account.
-	if !(pName == "github" && len(s.oauthCfg.GitHub.AllowedOrgs) > 0) {
+	orgChecked := pName == "github" && len(s.oauthCfg.GitHub.AllowedOrgs) > 0
+	if !orgChecked {
 		if allowed, err := s.signupAllowed(ctx); err != nil {
 			s.logger.Error("failed to check signup eligibility", "error", err, "procedure", "OAuthCallback")
 			return "", connerr.Internal("failed to process login")
