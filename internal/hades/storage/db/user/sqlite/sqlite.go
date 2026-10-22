@@ -217,6 +217,21 @@ func (s *SQLiteUserStorage) SetEmailVerified(ctx context.Context, userID string)
 	return err
 }
 
+func (s *SQLiteUserStorage) SetState(ctx context.Context, userID string, state identityv1.UserState) error {
+	// SQLite stores identifiers without hyphens; see sqlutil.ID.
+	userID = sqlutil.ID(userID)
+	_, err := s.q(ctx).ExecContext(ctx,
+		`UPDATE users SET state = ?, update_time = datetime('now') WHERE id = ? AND type = 2`, int32(state), userID)
+	return err
+}
+
+func (s *SQLiteUserStorage) Delete(ctx context.Context, userID string) error {
+	// SQLite stores identifiers without hyphens; see sqlutil.ID.
+	userID = sqlutil.ID(userID)
+	_, err := s.q(ctx).ExecContext(ctx, `DELETE FROM users WHERE id = ? AND type = 2`, userID)
+	return err
+}
+
 func (s *SQLiteUserStorage) UpdatePassword(ctx context.Context, userID, newHash string) error {
 	// SQLite stores identifiers without hyphens; see sqlutil.ID.
 	userID = sqlutil.ID(userID)

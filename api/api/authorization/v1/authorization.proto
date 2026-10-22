@@ -19,6 +19,9 @@ message UserBySessionRequest {}
 message UserBySessionResponse {
   // Full user record for the authenticated caller.
   hades.api.identity.v1.User user = 1;
+  // Whether the caller is a superadmin and may use AdminService. A display
+  // hint for clients; AdminService checks for itself.
+  bool is_superadmin = 2;
 }
 
 // Authorization resolves an authenticated credential to a user identity.

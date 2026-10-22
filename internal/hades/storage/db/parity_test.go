@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	authv1 "github.com/alipourhabibi/Hades/api/gen/api/auth/v1"
+	identityv1 "github.com/alipourhabibi/Hades/api/gen/api/identity/v1"
 	registryv1 "github.com/alipourhabibi/Hades/api/gen/api/registry/v1"
 	"github.com/alipourhabibi/Hades/config"
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db"
@@ -617,4 +618,28 @@ func commitNotFound() error { return commitpkg.ErrNotFound }
 
 func goGenerator() []config.GeneratorConfig {
 	return []config.GeneratorConfig{{Language: "go", Plugin: "protoc-gen-go", Options: "paths=source_relative"}}
+}
+
+func TestUserSetStateAndDeleteCascade(t *testing.T) {
+	eachBackend(t, func(t *testing.T, store db.Store) {
+		ctx := context.Background()
+		alice := mustUser(t, store, "alice", "alice@example.com")
+		users := store.User()
+
+		require.NoError(t, users.SetState(ctx, alice.Id, identityv1.UserState_USER_STATE_DEACTIVATED))
+		got, err := users.GetByID(ctx, alice.Id)
+		require.NoError(t, err)
+		assert.Equal(t, identityv1.UserState_USER_STATE_DEACTIVATED, got.State)
+
+		_, err = store.Session().CreateWithToken(ctx, alice.Id, "session", "hash-del", "10.0.0.1", "curl",
+			time.Now().Add(time.Hour), time.Now().Add(24*time.Hour))
+		require.NoError(t, err)
+
+		require.NoError(t, users.Delete(ctx, alice.Id))
+		_, err = users.GetByID(ctx, alice.Id)
+		assert.Error(t, err, "the account is gone")
+		live, err := store.Session().ListByUserID(ctx, alice.Id)
+		require.NoError(t, err)
+		assert.Empty(t, live, "sessions go with the account")
+	})
 }

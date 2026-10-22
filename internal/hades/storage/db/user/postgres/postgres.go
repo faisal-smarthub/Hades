@@ -168,6 +168,21 @@ func (u *UserStorage) SetEmailVerified(ctx context.Context, userID string) error
 	return err
 }
 
+// SetState changes a personal account's lifecycle state.
+func (u *UserStorage) SetState(ctx context.Context, userID string, state identityv1.UserState) error {
+	_, err := u.q(ctx).Exec(ctx,
+		`UPDATE users SET state = $1, update_time = NOW() WHERE id = $2 AND type = 2`,
+		int32(state), userID,
+	)
+	return err
+}
+
+// Delete removes a personal account.
+func (u *UserStorage) Delete(ctx context.Context, userID string) error {
+	_, err := u.q(ctx).Exec(ctx, `DELETE FROM users WHERE id = $1 AND type = 2`, userID)
+	return err
+}
+
 // UpdatePassword replaces the hashed password for a user.
 func (u *UserStorage) UpdatePassword(ctx context.Context, userID, newHash string) error {
 	_, err := u.q(ctx).Exec(ctx,

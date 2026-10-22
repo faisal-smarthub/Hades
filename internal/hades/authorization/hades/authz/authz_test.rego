@@ -45,6 +45,32 @@ test_non_superadmin_not_bypassed if {
 		with data.role_bindings as role_bindings
 }
 
+test_granted_superadmin_binding_allowed if {
+	data.hades.authz.allow with input as {
+		"subject": "erin",
+		"domain": "any/module",
+		"resource_type": "module",
+		"action": "delete",
+		"visibility": "private",
+	}
+		with data.superadmins as []
+		with data.role_bindings as {"erin": [{"role": "superadmin", "domain": "*"}]}
+}
+
+# The bypass requires the global domain: a superadmin binding scoped to one
+# namespace is not a way to escape that namespace.
+test_scoped_superadmin_binding_not_bypassed if {
+	not data.hades.authz.allow with input as {
+		"subject": "erin",
+		"domain": "other/module",
+		"resource_type": "module",
+		"action": "delete",
+		"visibility": "private",
+	}
+		with data.superadmins as []
+		with data.role_bindings as {"erin": [{"role": "superadmin", "domain": "erin/*"}]}
+}
+
 # ---------------------------------------------------------------------------
 # Public visibility bypass
 # ---------------------------------------------------------------------------

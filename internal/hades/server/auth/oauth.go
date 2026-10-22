@@ -207,6 +207,9 @@ func (s *Server) OAuthCallback(ctx context.Context, in *connect.Request[v1.OAuth
 		s.logger.Error("failed to load OAuth user", "error", err, "procedure", "OAuthCallback", "user_id", userID)
 		return nil, connerr.FromDB(err)
 	}
+	if user.GetState() == identityv1.UserState_USER_STATE_DEACTIVATED {
+		return nil, connerr.PermissionDenied(errAccountDeactivated)
+	}
 
 	fullToken, tokenHash, err := utilscrypto.GenerateToken(utilscrypto.SessionTokenPrefix)
 	if err != nil {

@@ -13,7 +13,6 @@
 package authorizationv1
 
 import (
-	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	v1 "github.com/alipourhabibi/Hades/api/gen/api/identity/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -70,7 +69,10 @@ func (*UserBySessionRequest) Descriptor() ([]byte, []int) {
 type UserBySessionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Full user record for the authenticated caller.
-	User          *v1.User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	User *v1.User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// Whether the caller is a superadmin and may use AdminService. A display
+	// hint for clients; AdminService checks for itself.
+	IsSuperadmin  bool `protobuf:"varint,2,opt,name=is_superadmin,json=isSuperadmin,proto3" json:"is_superadmin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -112,14 +114,22 @@ func (x *UserBySessionResponse) GetUser() *v1.User {
 	return nil
 }
 
+func (x *UserBySessionResponse) GetIsSuperadmin() bool {
+	if x != nil {
+		return x.IsSuperadmin
+	}
+	return false
+}
+
 var File_api_authorization_v1_authorization_proto protoreflect.FileDescriptor
 
 const file_api_authorization_v1_authorization_proto_rawDesc = "" +
 	"\n" +
-	"(api/authorization/v1/authorization.proto\x12\x1ahades.api.authorization.v1\x1a\x1aapi/identity/v1/user.proto\x1a\x1bbuf/validate/validate.proto\"\x16\n" +
-	"\x14UserBySessionRequest\"H\n" +
+	"(api/authorization/v1/authorization.proto\x12\x1ahades.api.authorization.v1\x1a\x1aapi/identity/v1/user.proto\"\x16\n" +
+	"\x14UserBySessionRequest\"m\n" +
 	"\x15UserBySessionResponse\x12/\n" +
-	"\x04user\x18\x01 \x01(\v2\x1b.hades.api.identity.v1.UserR\x04user2\x85\x01\n" +
+	"\x04user\x18\x01 \x01(\v2\x1b.hades.api.identity.v1.UserR\x04user\x12#\n" +
+	"\ris_superadmin\x18\x02 \x01(\bR\fisSuperadmin2\x85\x01\n" +
 	"\rAuthorization\x12t\n" +
 	"\rUserBySession\x120.hades.api.authorization.v1.UserBySessionRequest\x1a1.hades.api.authorization.v1.UserBySessionResponseB\x8c\x02\n" +
 	"\x1ecom.hades.api.authorization.v1B\x12AuthorizationProtoP\x01ZKgithub.com/alipourhabibi/Hades/api/gen/api/authorization/v1;authorizationv1\xa2\x02\x03HAA\xaa\x02\x1aHades.Api.Authorization.V1\xca\x02\x1aHades\\Api\\Authorization\\V1\xe2\x02&Hades\\Api\\Authorization\\V1\\GPBMetadata\xea\x02\x1dHades::Api::Authorization::V1b\x06proto3"

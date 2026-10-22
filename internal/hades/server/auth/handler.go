@@ -30,6 +30,10 @@ import (
 
 var dummyHash, _ = bcryptHash("x", bcrypt.DefaultCost)
 
+// errAccountDeactivated is the sign-in refusal for an account an administrator
+// has deactivated (AdminService.SetUserState).
+const errAccountDeactivated = "this account has been deactivated"
+
 // Server implements all auth-domain Connect-RPC service handlers.
 type Server struct {
 	v1connect.UnimplementedAuthenticationServiceHandler

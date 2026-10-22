@@ -295,6 +295,17 @@ func (s *Server) Login(ctx context.Context, in *connect.Request[v1.LoginRequest]
 		return nil, connerr.PermissionDenied("email not verified")
 	}
 
+	// Checked after the password, like the email check above, so the answer
+	// says nothing about an account to someone who does not hold its password.
+	// The interceptor would refuse the session on its first use anyway; this
+	// says why instead of handing out a token that cannot do anything.
+	if u, err := s.userStorage.GetByID(ctx, af.ID); err != nil {
+		s.logger.Error("failed to load user state", "error", err, "procedure", "Login", "user_id", af.ID)
+		return nil, connerr.FromDB(err)
+	} else if u.GetState() == identityv1.UserState_USER_STATE_DEACTIVATED {
+		return nil, connerr.PermissionDenied(errAccountDeactivated)
+	}
+
 	if err := s.userStorage.ResetFailedLogins(ctx, af.ID); err != nil {
 		s.logger.Error("failed to reset failed login count", "error", err, "procedure", "Login", "user_id", af.ID)
 	}

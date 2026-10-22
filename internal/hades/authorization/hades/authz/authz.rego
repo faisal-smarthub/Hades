@@ -18,6 +18,16 @@ import rego.v1
 # reading as though it granted everything.
 policy_allow(policy) if policy.subject in data.superadmins
 
+# Superadmins granted at runtime (AdminService.SetSuperadmin) are stored as a
+# "superadmin" binding on the global domain "*", so they are served, cached and
+# invalidated exactly like every other binding. The role is deliberately absent
+# from role_permissions: it is this clause, not the matrix, that grants it.
+policy_allow(policy) if {
+	some binding in data.role_bindings[policy.subject]
+	binding.role == "superadmin"
+	binding.domain == "*"
+}
+
 # Public visibility bypass: read and list are always allowed on public resources.
 policy_allow(policy) if {
 	policy.action in {"read", "list"}
