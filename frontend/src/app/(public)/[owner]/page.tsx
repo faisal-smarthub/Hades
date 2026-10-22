@@ -10,18 +10,17 @@ import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
 import Section from '@/components/ui/Section';
 import Tabs from '@/components/ui/Tabs';
-import Table from '@/components/ui/Table';
+import OrgMembers, { type OrgMember } from '@/components/OrgMembers';
 import { useAuthStore } from '@/stores/authStore';
 import {
   IconBox, IconUser, IconBuilding, IconGlobe, IconLock,
-  IconGitCommit, IconClock, IconShield, IconLink, IconMail, IconGear, IconAlert,
+  IconGitCommit, IconClock, IconLink, IconMail, IconGear, IconAlert,
 } from '@/components/icons';
 import { rpcFetch } from '@/lib/rpc';
 import { isSignedIn } from '@/lib/auth';
 import { isNotFound, formatError } from '@/lib/connectError';
 
 interface User { id: string; username: string; email?: string; description?: string; url?: string; type?: number | string; createTime?: string; updateTime?: string; }
-interface OrgMember { user: { id: string; username: string }; role: string; }
 interface Module { id: string; name: string; ownerId: string; visibility: number | string; description?: string; updateTime?: string; }
 
 const ORG_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'modules', label: 'Modules' }, { id: 'members', label: 'Members' }];
@@ -164,8 +163,6 @@ function ProfileContent() {
   );
 
   if (isOrg && org) {
-    type MemberRow = { username: string; role: string; _member: OrgMember };
-    const memberRows: MemberRow[] = members.map(m => ({ username: m.user?.username || '', role: m.role || '', _member: m }));
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ padding: '28px 32px 20px', borderBottom: '1px solid var(--c-border)' }}>
@@ -199,14 +196,7 @@ function ProfileContent() {
           )}
           {activeTab === 'modules' && <ModuleList modules={orgModules} navigate={router.push}/>}
           {activeTab === 'members' && (
-            <Section>
-              {memberRows.length === 0 ? <EmptyState icon={<IconUser size={40}/>} title="No members"/> : (
-                <Table<MemberRow> columns={[
-                  { key: 'username', label: 'Member', render: (val) => <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar initials={String(val).slice(0, 2).toUpperCase()} size={24}/><span style={{ cursor: 'pointer', color: 'var(--c-accent)' }} onClick={() => router.push(`/${val}`)}>@{String(val)}</span></div> },
-                  { key: 'role', label: 'Role', render: val => <Badge variant={String(val) === 'admin' ? 'purple' : 'default'}><IconShield size={10}/> {String(val) || 'member'}</Badge> },
-                ]} rows={memberRows}/>
-              )}
-            </Section>
+            <OrgMembers orgName={org.username} members={members} onChange={ms => { setMembers(ms); setOrgMemberCount(ms.length); }}/>
           )}
         </div>
       </div>

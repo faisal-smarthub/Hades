@@ -425,10 +425,28 @@ func (h *Handler) AddOrgMember(ctx context.Context, in *connect.Request[registry
 		return nil, connerr.InvalidArgument(`role must be "reader", "member" or "admin"`)
 	}
 
+	// Demoting the last admin leaves the org unmanageable, the same as removing
+	// them; see RemoveOrgMember.
+	if memberRole != "admin" {
+		if current, err := h.orgStorage.GetMemberRole(ctx, org.Id, target.Id); err == nil && current == "admin" {
+			if err := h.requireAnotherAdmin(ctx, org.Id, "AddOrgMember", "cannot demote the last admin of an organization"); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// Membership row and OPA binding are written together: the two stores
 	// together are what grants access, and half of the pair is either a
 	// member who cannot act or permissions with no membership record.
 	if _, err := h.uow.Do(ctx, func(txCtx context.Context) (interface{}, error) {
+		// Any binding the member already holds over the org is removed before
+		// the new one is written. Bindings accumulate, and the policy grants
+		// the union of them, so writing only the new role left a demoted admin
+		// listed as a reader while still holding admin rights.
+		if err := h.authz.DeleteOrgBinding(txCtx, target.Username, org.Username); err != nil {
+			h.logger.Error("failed to clear org member binding", "error", err, "org", org.Username, "member", target.Username)
+			return nil, connerr.Internal("failed to set member permissions")
+		}
 		if err := h.orgStorage.AddMember(txCtx, org.Id, target.Id, memberRole); err != nil {
 			h.logger.Error("failed to add org member", "error", err, "org_id", org.Id, "member_id", target.Id)
 			return nil, connerr.Internal("failed to add member")
@@ -478,19 +496,8 @@ func (h *Handler) RemoveOrgMember(ctx context.Context, in *connect.Request[regis
 		return nil, connerr.NotFound("user is not a member of this organization")
 	}
 	if targetRole == "admin" {
-		members, err := h.orgStorage.ListMembers(ctx, org.Id)
-		if err != nil {
-			h.logger.Error("failed to list org members", "error", err, "procedure", "RemoveOrgMember", "org_id", org.Id)
-			return nil, connerr.FromDB(err)
-		}
-		admins := 0
-		for _, m := range members {
-			if m.Role == "admin" {
-				admins++
-			}
-		}
-		if admins <= 1 {
-			return nil, connerr.FailedPrecondition("cannot remove the last admin of an organization")
+		if err := h.requireAnotherAdmin(ctx, org.Id, "RemoveOrgMember", "cannot remove the last admin of an organization"); err != nil {
+			return nil, err
 		}
 	}
 
@@ -513,4 +520,24 @@ func (h *Handler) RemoveOrgMember(ctx context.Context, in *connect.Request[regis
 	return &connect.Response[registrypbv1.RemoveOrgMemberResponse]{
 		Msg: &registrypbv1.RemoveOrgMemberResponse{},
 	}, nil
+}
+
+// requireAnotherAdmin returns FailedPrecondition with msg unless the org has
+// more than one admin, for the callers about to take admin away from one.
+func (h *Handler) requireAnotherAdmin(ctx context.Context, orgID, procedure, msg string) error {
+	members, err := h.orgStorage.ListMembers(ctx, orgID)
+	if err != nil {
+		h.logger.Error("failed to list org members", "error", err, "procedure", procedure, "org_id", orgID)
+		return connerr.FromDB(err)
+	}
+	admins := 0
+	for _, m := range members {
+		if m.Role == "admin" {
+			admins++
+		}
+	}
+	if admins <= 1 {
+		return connerr.FailedPrecondition(msg)
+	}
+	return nil
 }
