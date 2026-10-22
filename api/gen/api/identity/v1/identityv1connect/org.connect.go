@@ -79,9 +79,11 @@ type OrgServiceClient interface {
 	// Returns PERMISSION_DENIED unless the caller is an admin of the org.
 	UpdateOrg(context.Context, *connect.Request[v1.UpdateOrgRequest]) (*connect.Response[v1.UpdateOrgResponse], error)
 	// AddOrgMember adds a user to an organization with the given role.
-	// Calling it for an existing member updates their role.
-	// Returns PERMISSION_DENIED unless the caller is an admin of the org, and
-	// NOT_FOUND if the org or the target user does not exist.
+	// Calling it for an existing member changes their role, replacing the
+	// permissions of the old one.
+	// Returns PERMISSION_DENIED unless the caller is an admin of the org,
+	// NOT_FOUND if the org or the target user does not exist, and
+	// FAILED_PRECONDITION when demoting the org's last admin.
 	AddOrgMember(context.Context, *connect.Request[v1.AddOrgMemberRequest]) (*connect.Response[v1.AddOrgMemberResponse], error)
 	// RemoveOrgMember removes a user from an organization. The caller must be an
 	// admin of the org, or the member themselves.
@@ -229,9 +231,11 @@ type OrgServiceHandler interface {
 	// Returns PERMISSION_DENIED unless the caller is an admin of the org.
 	UpdateOrg(context.Context, *connect.Request[v1.UpdateOrgRequest]) (*connect.Response[v1.UpdateOrgResponse], error)
 	// AddOrgMember adds a user to an organization with the given role.
-	// Calling it for an existing member updates their role.
-	// Returns PERMISSION_DENIED unless the caller is an admin of the org, and
-	// NOT_FOUND if the org or the target user does not exist.
+	// Calling it for an existing member changes their role, replacing the
+	// permissions of the old one.
+	// Returns PERMISSION_DENIED unless the caller is an admin of the org,
+	// NOT_FOUND if the org or the target user does not exist, and
+	// FAILED_PRECONDITION when demoting the org's last admin.
 	AddOrgMember(context.Context, *connect.Request[v1.AddOrgMemberRequest]) (*connect.Response[v1.AddOrgMemberResponse], error)
 	// RemoveOrgMember removes a user from an organization. The caller must be an
 	// admin of the org, or the member themselves.

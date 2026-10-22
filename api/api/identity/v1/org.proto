@@ -174,9 +174,11 @@ service OrgService {
   rpc UpdateOrg(UpdateOrgRequest) returns (UpdateOrgResponse);
 
   // AddOrgMember adds a user to an organization with the given role.
-  // Calling it for an existing member updates their role.
-  // Returns PERMISSION_DENIED unless the caller is an admin of the org, and
-  // NOT_FOUND if the org or the target user does not exist.
+  // Calling it for an existing member changes their role, replacing the
+  // permissions of the old one.
+  // Returns PERMISSION_DENIED unless the caller is an admin of the org,
+  // NOT_FOUND if the org or the target user does not exist, and
+  // FAILED_PRECONDITION when demoting the org's last admin.
   rpc AddOrgMember(AddOrgMemberRequest) returns (AddOrgMemberResponse);
 
   // RemoveOrgMember removes a user from an organization. The caller must be an

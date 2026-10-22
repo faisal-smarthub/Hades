@@ -323,6 +323,74 @@ func TestAddOrgMember_UnknownUserIsNotFound(t *testing.T) {
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err))
 }
 
+// can asks the policy engine whether subject may perform action on resource
+// in the acme namespace.
+func (f *fixture) can(t *testing.T, subject, resource, action string) bool {
+	t.Helper()
+	resp, err := f.authz.Can(context.Background(), &constants.Policy{
+		Subject: subject, ResourceType: resource, Action: action, Domain: "acme/thing", Visibility: "private",
+	})
+	require.NoError(t, err)
+	return resp.Allowed
+}
+
+// TestAddOrgMember_DemotionRemovesTheOldRole covers the bug where a role
+// change added the new binding beside the old one. The policy grants the union
+// of a subject's bindings, so a demoted admin was listed as a reader and kept
+// every admin right.
+func TestAddOrgMember_DemotionRemovesTheOldRole(t *testing.T) {
+	f := newFixture(t)
+	org := f.mustCreateOrg(t, "acme")
+	require.NoError(t, f.addMember(t, "bob", "admin"))
+	require.True(t, f.can(t, "bob", "org", "admin"))
+
+	require.NoError(t, f.addMember(t, "bob", "reader"))
+
+	role, err := f.env.DB.Org().GetMemberRole(context.Background(), org.Id, f.bob.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "reader", role)
+	assert.False(t, f.can(t, "bob", "org", "admin"), "a demoted admin cannot manage members")
+	assert.False(t, f.can(t, "bob", "module", "delete"), "nor delete modules")
+	assert.False(t, f.can(t, "bob", "module", "push"), "a reader cannot push")
+	assert.True(t, f.can(t, "bob", "module", "read"), "but can still read")
+
+	require.NoError(t, f.addMember(t, "bob", "admin"))
+	assert.True(t, f.can(t, "bob", "org", "admin"), "promotion back works")
+}
+
+func TestAddOrgMember_LastAdminCannotBeDemoted(t *testing.T) {
+	f := newFixture(t)
+	f.mustCreateOrg(t, "acme")
+
+	err := f.addMember(t, "alice", "member")
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
+	assert.True(t, f.can(t, "alice", "org", "admin"), "the refused demotion changed nothing")
+
+	// With a second admin the creator may step down, and loses the owner
+	// binding the org was created with along with the admin role.
+	require.NoError(t, f.addMember(t, "bob", "admin"))
+	require.NoError(t, f.addMember(t, "alice", "member"))
+	assert.False(t, f.can(t, "alice", "org", "admin"))
+	assert.False(t, f.can(t, "alice", "module", "delete"))
+	assert.True(t, f.can(t, "alice", "module", "push"), "a member can push")
+}
+
+func TestAddOrgMember_MemberCannotChangeRoles(t *testing.T) {
+	f := newFixture(t)
+	f.mustCreateOrg(t, "acme")
+	require.NoError(t, f.addMember(t, "bob", "member"))
+
+	_, err := f.h.AddOrgMember(ctxFor(f.bob), connect.NewRequest(&identityv1.AddOrgMemberRequest{
+		OrgName: "acme", Username: "bob", Role: "admin",
+	}))
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member cannot promote themselves")
+	_, err = f.h.AddOrgMember(ctxFor(f.bob), connect.NewRequest(&identityv1.AddOrgMemberRequest{
+		OrgName: "acme", Username: "alice", Role: "reader",
+	}))
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "nor demote an admin")
+	assert.False(t, f.can(t, "bob", "org", "admin"))
+}
+
 func TestRemoveOrgMember_RemovesMembershipAndBindingTogether(t *testing.T) {
 	f := newFixture(t)
 	org := f.mustCreateOrg(t, "acme")
