@@ -75,7 +75,14 @@ func (g *GitalyStorage) DeleteRepository(ctx context.Context, repoPath string) e
 	if err := git.ValidateRepoPath(repoPath); err != nil {
 		return err
 	}
-	return g.repo.DeleteRepository(ctx, &registryv1.Module{Name: repoPath})
+	err := g.repo.DeleteRepository(ctx, &registryv1.Module{Name: repoPath})
+	// git.Storage documents DeleteRepository as idempotent, and gogit's
+	// os.RemoveAll already is. Gitaly reports NotFound for a repository that is
+	// already gone, which is the outcome the caller asked for.
+	if grpcCode(err) == codes.NotFound {
+		return nil
+	}
+	return err
 }
 
 func (g *GitalyStorage) PutFiles(ctx context.Context, req git.PutFilesRequest) (string, error) {

@@ -99,6 +99,7 @@ domain_matches("*", _)
 #   module:publish  ModuleService.UpdateModule, only for the private-to-public
 #                   transition, which is a different decision from editing a
 #                   description and is therefore a different action
+#   module:delete   ModuleService.DeleteModule
 #   module:push     UploadService.Upload (batched, one policy per module)
 #   module:read     CheckReadAccess, on every private module any read touches
 #   org:update      OrgService.UpdateOrg
@@ -109,7 +110,7 @@ domain_matches("*", _)
 # migration 033. Vocabulary that reads as enforcement and enforces nothing is
 # worse than no vocabulary.
 #
-# The module actions list, delete, admin and transfer are still declared and
+# The module actions list, admin and transfer are still declared and
 # still unreached. "list" in particular is never asked, so ListModules filters
 # with module:read per row and reader and contributor see the same set.
 # ---------------------------------------------------------------------------

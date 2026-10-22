@@ -822,6 +822,98 @@ func (x *UpdateModuleResponse) GetModule() *Module {
 	return nil
 }
 
+// DeleteModuleRequest is the input for ModuleService.DeleteModule.
+type DeleteModuleRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Username of the module owner.
+	Owner string `protobuf:"bytes,1,opt,name=owner,proto3" json:"owner,omitempty"`
+	// Short module name (without the owner prefix).
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteModuleRequest) Reset() {
+	*x = DeleteModuleRequest{}
+	mi := &file_api_registry_v1_module_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteModuleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteModuleRequest) ProtoMessage() {}
+
+func (x *DeleteModuleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_module_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteModuleRequest.ProtoReflect.Descriptor instead.
+func (*DeleteModuleRequest) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_module_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DeleteModuleRequest) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *DeleteModuleRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+// DeleteModuleResponse is empty.
+type DeleteModuleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteModuleResponse) Reset() {
+	*x = DeleteModuleResponse{}
+	mi := &file_api_registry_v1_module_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteModuleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteModuleResponse) ProtoMessage() {}
+
+func (x *DeleteModuleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_module_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteModuleResponse.ProtoReflect.Descriptor instead.
+func (*DeleteModuleResponse) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_module_proto_rawDescGZIP(), []int{9}
+}
+
 // GetModuleRequest is the input for ModuleService.GetModule.
 type GetModuleRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -835,7 +927,7 @@ type GetModuleRequest struct {
 
 func (x *GetModuleRequest) Reset() {
 	*x = GetModuleRequest{}
-	mi := &file_api_registry_v1_module_proto_msgTypes[8]
+	mi := &file_api_registry_v1_module_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -847,7 +939,7 @@ func (x *GetModuleRequest) String() string {
 func (*GetModuleRequest) ProtoMessage() {}
 
 func (x *GetModuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_module_proto_msgTypes[8]
+	mi := &file_api_registry_v1_module_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -860,7 +952,7 @@ func (x *GetModuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetModuleRequest.ProtoReflect.Descriptor instead.
 func (*GetModuleRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_module_proto_rawDescGZIP(), []int{8}
+	return file_api_registry_v1_module_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetModuleRequest) GetOwner() string {
@@ -887,7 +979,7 @@ type GetModuleResponse struct {
 
 func (x *GetModuleResponse) Reset() {
 	*x = GetModuleResponse{}
-	mi := &file_api_registry_v1_module_proto_msgTypes[9]
+	mi := &file_api_registry_v1_module_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -899,7 +991,7 @@ func (x *GetModuleResponse) String() string {
 func (*GetModuleResponse) ProtoMessage() {}
 
 func (x *GetModuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_module_proto_msgTypes[9]
+	mi := &file_api_registry_v1_module_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -912,7 +1004,7 @@ func (x *GetModuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetModuleResponse.ProtoReflect.Descriptor instead.
 func (*GetModuleResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_module_proto_rawDescGZIP(), []int{9}
+	return file_api_registry_v1_module_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetModuleResponse) GetModule() *Module {
@@ -987,7 +1079,11 @@ const file_api_registry_v1_module_proto_rawDesc = "" +
 	"\f_lint_presetB\x13\n" +
 	"\x11_breaking_enabled\"M\n" +
 	"\x14UpdateModuleResponse\x125\n" +
-	"\x06module\x18\x01 \x01(\v2\x1d.hades.api.registry.v1.ModuleR\x06module\"L\n" +
+	"\x06module\x18\x01 \x01(\v2\x1d.hades.api.registry.v1.ModuleR\x06module\"Q\n" +
+	"\x13DeleteModuleRequest\x12\x1d\n" +
+	"\x05owner\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05owner\x12\x1b\n" +
+	"\x04name\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04name\"\x16\n" +
+	"\x14DeleteModuleResponse\"L\n" +
 	"\x10GetModuleRequest\x12\x1c\n" +
 	"\x05owner\x18\x01 \x01(\tB\x06\xbaH\x03\xc8\x01\x01R\x05owner\x12\x1a\n" +
 	"\x04name\x18\x02 \x01(\tB\x06\xbaH\x03\xc8\x01\x01R\x04name\"J\n" +
@@ -1007,12 +1103,13 @@ const file_api_registry_v1_module_proto_rawDesc = "" +
 	"\x13LINT_PRESET_DEFAULT\x10\x01\x12\x15\n" +
 	"\x11LINT_PRESET_BASIC\x10\x02\x12\x17\n" +
 	"\x13LINT_PRESET_MINIMAL\x10\x03\x12\x18\n" +
-	"\x14LINT_PRESET_COMMENTS\x10\x042\xb9\x03\n" +
+	"\x14LINT_PRESET_COMMENTS\x10\x042\xa2\x04\n" +
 	"\rModuleService\x12y\n" +
 	"\x12CreateModuleByName\x120.hades.api.registry.v1.CreateModuleByNameRequest\x1a1.hades.api.registry.v1.CreateModuleByNameResponse\x12d\n" +
 	"\vListModules\x12).hades.api.registry.v1.ListModulesRequest\x1a*.hades.api.registry.v1.ListModulesResponse\x12^\n" +
 	"\tGetModule\x12'.hades.api.registry.v1.GetModuleRequest\x1a(.hades.api.registry.v1.GetModuleResponse\x12g\n" +
-	"\fUpdateModule\x12*.hades.api.registry.v1.UpdateModuleRequest\x1a+.hades.api.registry.v1.UpdateModuleResponseB\xe2\x01\n" +
+	"\fUpdateModule\x12*.hades.api.registry.v1.UpdateModuleRequest\x1a+.hades.api.registry.v1.UpdateModuleResponse\x12g\n" +
+	"\fDeleteModule\x12*.hades.api.registry.v1.DeleteModuleRequest\x1a+.hades.api.registry.v1.DeleteModuleResponseB\xe2\x01\n" +
 	"\x19com.hades.api.registry.v1B\vModuleProtoP\x01ZAgithub.com/alipourhabibi/Hades/api/gen/api/registry/v1;registryv1\xa2\x02\x03HAR\xaa\x02\x15Hades.Api.Registry.V1\xca\x02\x15Hades\\Api\\Registry\\V1\xe2\x02!Hades\\Api\\Registry\\V1\\GPBMetadata\xea\x02\x18Hades::Api::Registry::V1b\x06proto3"
 
 var (
@@ -1028,7 +1125,7 @@ func file_api_registry_v1_module_proto_rawDescGZIP() []byte {
 }
 
 var file_api_registry_v1_module_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_api_registry_v1_module_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_api_registry_v1_module_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_api_registry_v1_module_proto_goTypes = []any{
 	(ModuleVisibility)(0),              // 0: hades.api.registry.v1.ModuleVisibility
 	(ModuleState)(0),                   // 1: hades.api.registry.v1.ModuleState
@@ -1041,13 +1138,15 @@ var file_api_registry_v1_module_proto_goTypes = []any{
 	(*ListModulesResponse)(nil),        // 8: hades.api.registry.v1.ListModulesResponse
 	(*UpdateModuleRequest)(nil),        // 9: hades.api.registry.v1.UpdateModuleRequest
 	(*UpdateModuleResponse)(nil),       // 10: hades.api.registry.v1.UpdateModuleResponse
-	(*GetModuleRequest)(nil),           // 11: hades.api.registry.v1.GetModuleRequest
-	(*GetModuleResponse)(nil),          // 12: hades.api.registry.v1.GetModuleResponse
-	(*timestamppb.Timestamp)(nil),      // 13: google.protobuf.Timestamp
+	(*DeleteModuleRequest)(nil),        // 11: hades.api.registry.v1.DeleteModuleRequest
+	(*DeleteModuleResponse)(nil),       // 12: hades.api.registry.v1.DeleteModuleResponse
+	(*GetModuleRequest)(nil),           // 13: hades.api.registry.v1.GetModuleRequest
+	(*GetModuleResponse)(nil),          // 14: hades.api.registry.v1.GetModuleResponse
+	(*timestamppb.Timestamp)(nil),      // 15: google.protobuf.Timestamp
 }
 var file_api_registry_v1_module_proto_depIdxs = []int32{
-	13, // 0: hades.api.registry.v1.Module.create_time:type_name -> google.protobuf.Timestamp
-	13, // 1: hades.api.registry.v1.Module.update_time:type_name -> google.protobuf.Timestamp
+	15, // 0: hades.api.registry.v1.Module.create_time:type_name -> google.protobuf.Timestamp
+	15, // 1: hades.api.registry.v1.Module.update_time:type_name -> google.protobuf.Timestamp
 	0,  // 2: hades.api.registry.v1.Module.visibility:type_name -> hades.api.registry.v1.ModuleVisibility
 	1,  // 3: hades.api.registry.v1.Module.state:type_name -> hades.api.registry.v1.ModuleState
 	2,  // 4: hades.api.registry.v1.Module.lint_preset:type_name -> hades.api.registry.v1.LintPreset
@@ -1061,14 +1160,16 @@ var file_api_registry_v1_module_proto_depIdxs = []int32{
 	3,  // 12: hades.api.registry.v1.GetModuleResponse.module:type_name -> hades.api.registry.v1.Module
 	5,  // 13: hades.api.registry.v1.ModuleService.CreateModuleByName:input_type -> hades.api.registry.v1.CreateModuleByNameRequest
 	7,  // 14: hades.api.registry.v1.ModuleService.ListModules:input_type -> hades.api.registry.v1.ListModulesRequest
-	11, // 15: hades.api.registry.v1.ModuleService.GetModule:input_type -> hades.api.registry.v1.GetModuleRequest
+	13, // 15: hades.api.registry.v1.ModuleService.GetModule:input_type -> hades.api.registry.v1.GetModuleRequest
 	9,  // 16: hades.api.registry.v1.ModuleService.UpdateModule:input_type -> hades.api.registry.v1.UpdateModuleRequest
-	6,  // 17: hades.api.registry.v1.ModuleService.CreateModuleByName:output_type -> hades.api.registry.v1.CreateModuleByNameResponse
-	8,  // 18: hades.api.registry.v1.ModuleService.ListModules:output_type -> hades.api.registry.v1.ListModulesResponse
-	12, // 19: hades.api.registry.v1.ModuleService.GetModule:output_type -> hades.api.registry.v1.GetModuleResponse
-	10, // 20: hades.api.registry.v1.ModuleService.UpdateModule:output_type -> hades.api.registry.v1.UpdateModuleResponse
-	17, // [17:21] is the sub-list for method output_type
-	13, // [13:17] is the sub-list for method input_type
+	11, // 17: hades.api.registry.v1.ModuleService.DeleteModule:input_type -> hades.api.registry.v1.DeleteModuleRequest
+	6,  // 18: hades.api.registry.v1.ModuleService.CreateModuleByName:output_type -> hades.api.registry.v1.CreateModuleByNameResponse
+	8,  // 19: hades.api.registry.v1.ModuleService.ListModules:output_type -> hades.api.registry.v1.ListModulesResponse
+	14, // 20: hades.api.registry.v1.ModuleService.GetModule:output_type -> hades.api.registry.v1.GetModuleResponse
+	10, // 21: hades.api.registry.v1.ModuleService.UpdateModule:output_type -> hades.api.registry.v1.UpdateModuleResponse
+	12, // 22: hades.api.registry.v1.ModuleService.DeleteModule:output_type -> hades.api.registry.v1.DeleteModuleResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
 	13, // [13:13] is the sub-list for extension extendee
 	0,  // [0:13] is the sub-list for field type_name
@@ -1086,7 +1187,7 @@ func file_api_registry_v1_module_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_registry_v1_module_proto_rawDesc), len(file_api_registry_v1_module_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

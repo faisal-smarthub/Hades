@@ -133,6 +133,7 @@ func matrix() []policyRow {
 		// -- Registry writes. -------------------------------------------------
 		{registryv1connect.ModuleServiceCreateModuleByNameProcedure, credAny, guardOPA, "module:create on owner/name"},
 		{registryv1connect.ModuleServiceUpdateModuleProcedure, credAny, guardOPA, "module:update on owner/name"},
+		{registryv1connect.ModuleServiceDeleteModuleProcedure, credSession, guardOPA, "module:delete on owner/name"},
 
 		// -- Identity. --------------------------------------------------------
 		{identityv1connect.UserServiceGetUserProcedure, credOptional, guardPublic, "profile is public; email redacted unless it is the caller's own"},
@@ -225,6 +226,7 @@ func TestEveryWriteToARegistryResourceAsksThePolicyEngine(t *testing.T) {
 	registryProcedures := []string{
 		registryv1connect.ModuleServiceCreateModuleByNameProcedure,
 		registryv1connect.ModuleServiceUpdateModuleProcedure,
+		registryv1connect.ModuleServiceDeleteModuleProcedure,
 		registryv1connect.ModuleServiceListModulesProcedure,
 		registryv1connect.ModuleServiceGetModuleProcedure,
 		registryv1connect.CommitServiceListCommitsProcedure,

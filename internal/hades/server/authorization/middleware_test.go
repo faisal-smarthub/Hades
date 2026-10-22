@@ -73,6 +73,7 @@ func knownProcedures() map[string]bool {
 		registryv1connect.ModuleServiceGetModuleProcedure,
 		registryv1connect.ModuleServiceCreateModuleByNameProcedure,
 		registryv1connect.ModuleServiceUpdateModuleProcedure,
+		registryv1connect.ModuleServiceDeleteModuleProcedure,
 		registryv1connect.CommitServiceListCommitsProcedure,
 		registryv1connect.CommitServiceGetCommitProcedure,
 		registryv1connect.CommitServiceGetCommitDiffProcedure,

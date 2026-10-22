@@ -17,6 +17,7 @@ import (
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db"
 	commitpkg "github.com/alipourhabibi/Hades/internal/hades/storage/db/commit"
 	"github.com/alipourhabibi/Hades/internal/hades/storage/db/devicegrant"
+	"github.com/alipourhabibi/Hades/internal/hades/storage/db/resource"
 )
 
 // Backend-parity tests.
@@ -641,5 +642,37 @@ func TestUserSetStateAndDeleteCascade(t *testing.T) {
 		live, err := store.Session().ListByUserID(ctx, alice.Id)
 		require.NoError(t, err)
 		assert.Empty(t, live, "sessions go with the account")
+	})
+}
+
+func TestModuleDeleteCascadesAndClearsResources(t *testing.T) {
+	eachBackend(t, func(t *testing.T, store db.Store) {
+		ctx := context.Background()
+		alice := mustUser(t, store, "alice", "alice@example.com")
+		doomed := mustModule(t, store, "alice/doomed", alice.Id, moduleVisibilityPublic)
+		kept := mustModule(t, store, "alice/kept", alice.Id, moduleVisibilityPublic)
+
+		doomedCommit, keptCommit := uuid.New(), uuid.New()
+		require.NoError(t, store.Commit().Create(ctx, doomedCommit, "aaaa000000000000000000000000000000000001",
+			alice.Id, doomed.Id, digestTypeB5, "digest-doomed", alice.Id, ""))
+		require.NoError(t, store.Commit().Create(ctx, keptCommit, "aaaa000000000000000000000000000000000002",
+			alice.Id, kept.Id, digestTypeB5, "digest-kept", alice.Id, ""))
+
+		require.NoError(t, store.Module().Delete(ctx, doomed.Id))
+
+		_, err := store.Module().GetModuleByOwnerAndName(ctx, "alice", "doomed")
+		assert.Error(t, err, "the module is gone")
+		_, err = store.Commit().GetCommitById(ctx, doomedCommit.String())
+		assert.Error(t, err, "its commits go with it")
+		_, err = store.Resource().ResolveType(ctx, doomed.Id)
+		assert.ErrorIs(t, err, resource.ErrNotFound, "the module's resource row is removed")
+		_, err = store.Resource().ResolveType(ctx, doomedCommit.String())
+		assert.ErrorIs(t, err, resource.ErrNotFound, "its commits' resource rows are removed")
+
+		_, err = store.Module().GetModuleByOwnerAndName(ctx, "alice", "kept")
+		assert.NoError(t, err, "another module is untouched")
+		rt, err := store.Resource().ResolveType(ctx, keptCommit.String())
+		require.NoError(t, err)
+		assert.Equal(t, resource.ResourceTypeCommit, rt)
 	})
 }

@@ -226,6 +226,20 @@ func (m *SQLiteModuleStorage) CountByOwner(ctx context.Context, ownerID string) 
 	return count, err
 }
 
+func (m *SQLiteModuleStorage) Delete(ctx context.Context, moduleID string) error {
+	// SQLite stores identifiers without hyphens; see sqlutil.ID.
+	moduleID = sqlutil.ID(moduleID)
+	// Resources first: the commit ids are read from the rows the second
+	// statement cascades away.
+	if _, err := m.q(ctx).ExecContext(ctx,
+		`DELETE FROM resources WHERE id = ?1 OR id IN (SELECT id FROM commits WHERE module_id = ?1)`, moduleID,
+	); err != nil {
+		return err
+	}
+	_, err := m.q(ctx).ExecContext(ctx, `DELETE FROM modules WHERE id = ?`, moduleID)
+	return err
+}
+
 var _ module.Storage = (*SQLiteModuleStorage)(nil)
 
 // visibilityPredicate narrows a module query to rows the caller may plausibly

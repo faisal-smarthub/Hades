@@ -66,6 +66,7 @@ func (f *fakeModuleDB) GetModulesByRefs(context.Context, ...*registryv1.ModuleRe
 	return nil, nil
 }
 func (f *fakeModuleDB) CountByOwner(context.Context, string) (int32, error) { return 0, nil }
+func (f *fakeModuleDB) Delete(context.Context, string) error                { return nil }
 
 // fakeCommitDB implements commitdb.Storage; only GetByHashPrefix is used.
 type fakeCommitDB struct {

@@ -28,4 +28,9 @@ type Storage interface {
 	GetModuleByOwnerAndName(ctx context.Context, owner, name string) (*registryv1.Module, error)
 	GetModulesByRefs(ctx context.Context, refs ...*registryv1.ModuleRef) ([]*registryv1.Module, error)
 	CountByOwner(ctx context.Context, ownerID string) (int32, error)
+	// Delete removes a module row; its commits, CI runs and SDK jobs go with it
+	// by cascade. The resources rows for the module and its commits are removed
+	// explicitly, since that table has no foreign keys. It does not touch the
+	// git repository.
+	Delete(ctx context.Context, moduleID string) error
 }

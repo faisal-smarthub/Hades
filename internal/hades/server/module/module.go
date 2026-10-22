@@ -52,6 +52,7 @@ type moduleStorage interface {
 	GetModuleByOwnerAndName(ctx context.Context, owner, name string) (*registrypbv1.Module, error)
 	Create(ctx context.Context, name, ownerId string, visibility registrypbv1.ModuleVisibility, state registrypbv1.ModuleState, description, url, defaultLabelName, defaultBranch string, lintPreset registrypbv1.LintPreset, breakingEnabled bool) (*registrypbv1.Module, error)
 	Update(ctx context.Context, req *registrypbv1.UpdateModuleRequest) (*registrypbv1.Module, error)
+	Delete(ctx context.Context, moduleID string) error
 }
 
 // authService is the subset of the authorization Server used by the Server.
@@ -565,6 +566,72 @@ func (s *Server) UpdateModule(ctx context.Context, in *connect.Request[registryp
 	return &connect.Response[registrypbv1.UpdateModuleResponse]{
 		Msg: &registrypbv1.UpdateModuleResponse{Module: updated},
 	}, nil
+}
+
+// DeleteModule permanently removes a module, its repository and its history.
+//
+// The repository is removed inside the database transaction, the one place a
+// Gitaly call is made with a transaction open. Deletion has no compensation:
+// a repository cannot be restored once removed. Ordered this way, a Gitaly
+// failure rolls the rows back and the module is left whole, and a commit
+// failure after the repository is gone leaves a row that a retry deletes,
+// since DeleteRepository treats a missing repository as success. The other
+// order, rows first, would leave an orphan repository that makes the name
+// impossible to create again.
+func (s *Server) DeleteModule(ctx context.Context, in *connect.Request[registrypbv1.DeleteModuleRequest]) (*connect.Response[registrypbv1.DeleteModuleResponse], error) {
+	const procedure = "DeleteModule"
+	user, ok := ctx.Value(constants.ContextKeyUser).(*identityv1.User)
+	if !ok {
+		s.logger.Error("missing user in context", "procedure", procedure)
+		return nil, connerr.Unauthenticated("not authenticated")
+	}
+
+	moduleFullName := in.Msg.Owner + "/" + in.Msg.Name
+
+	can, err := s.authorization.Can(ctx, &constants.Policy{
+		Subject:      user.Username,
+		ResourceType: string(constants.ResourceModule),
+		Action:       string(constants.ActionDelete),
+		Domain:       moduleFullName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !can.Allowed {
+		s.logger.Warn("user not allowed to delete module", "procedure", procedure, "user_id", user.Id, "module", moduleFullName)
+		return nil, connerr.PermissionDenied("user is not allowed to delete this module")
+	}
+
+	current, err := s.moduleDBStorage.GetModuleByOwnerAndName(ctx, in.Msg.Owner, in.Msg.Name)
+	if err != nil {
+		return nil, connerr.FromDB(err)
+	}
+
+	var logID uuid.UUID
+	if s.gitalyOpLog != nil {
+		logID, _ = s.gitalyOpLog.CreatePending(ctx, gitalyoplog.OpDeleteModule, moduleFullName, user.Id)
+	}
+
+	_, err = s.uow.Do(ctx, func(txCtx context.Context) (interface{}, error) {
+		if err := s.moduleDBStorage.Delete(txCtx, current.Id); err != nil {
+			return nil, connerr.FromDB(err)
+		}
+		if err := s.gitStorage.DeleteRepository(txCtx, current.Name); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}, 30*time.Second)
+	if err != nil {
+		s.logger.Error("failed to delete module", "error", err, "procedure", procedure, "module", moduleFullName)
+		s.recordOpLogFailure(ctx, logID, err)
+		return nil, err
+	}
+	if s.gitalyOpLog != nil && logID != uuid.Nil {
+		_ = s.gitalyOpLog.UpdateStatus(ctx, logID, gitalyoplog.StatusCompleted, "", "")
+	}
+
+	s.logger.Info("module deleted", "procedure", procedure, "actor", user.Username, "module", moduleFullName)
+	return connect.NewResponse(&registrypbv1.DeleteModuleResponse{}), nil
 }
 
 func lintPresetToRule(p registrypbv1.LintPreset) string {

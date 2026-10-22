@@ -28,6 +28,7 @@ const (
 const (
 	OpCreateModule = "create_module"
 	OpCommitFiles  = "commit_files"
+	OpDeleteModule = "delete_module"
 )
 
 // Storage is the domain interface for the operation log.

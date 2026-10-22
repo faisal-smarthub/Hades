@@ -130,3 +130,8 @@ export function addRecentModule(m: RecentModule): void {
   const existing = getRecentModules().filter(r => r.fullName !== m.fullName);
   localStorage.setItem(RECENT_KEY, JSON.stringify([m, ...existing].slice(0, 4)));
 }
+
+export function removeRecentModule(fullName: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(RECENT_KEY, JSON.stringify(getRecentModules().filter(r => r.fullName !== fullName)));
+}
