@@ -43,6 +43,10 @@ func (f *fakeModuleStorage) Update(_ context.Context, _ *registrypbv1.UpdateModu
 	return nil, f.err
 }
 
+func (f *fakeModuleStorage) Delete(_ context.Context, _ string) error {
+	return f.err
+}
+
 type fakeAuth struct{ err error }
 
 func (f *fakeAuth) CheckReadAccess(_ context.Context, _ *identityv1.User, _ []*registrypbv1.Module) error {

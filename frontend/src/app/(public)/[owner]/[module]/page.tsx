@@ -19,7 +19,7 @@ import {
   IconBox, IconGitCommit, IconTag, IconCode, IconGlobe, IconLock, IconPackage,
   IconClock, IconBranch, IconDownload, IconStar, IconFolder, IconFile, IconChevronRight, IconAlert,
 } from '@/components/icons';
-import { addRecentModule } from '@/lib/auth';
+import { addRecentModule, removeRecentModule } from '@/lib/auth';
 import { DOMAIN } from '@/lib/config';
 import { rpcFetch } from '@/lib/rpc';
 import { isNotFound, formatError } from '@/lib/connectError';
@@ -111,6 +111,10 @@ function ModuleDetailContent() {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  // Deletion is confirmed by typing the module's full name.
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [dirEntries, setDirEntries] = useState<FileEntry[]>([]);
   const [dirLoading, setDirLoading] = useState(false);
   const [dirError, setDirError] = useState<string | null>(null);
@@ -507,6 +511,35 @@ function ModuleDetailContent() {
               >{settingsSaving ? 'Saving…' : 'Save changes'}</Btn>
               {settingsSaved && <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--c-success)' }}>Saved</span>}
               {settingsError && <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--c-error)' }}>{settingsError}</span>}
+            </div>
+            <div style={{ marginTop: 12, padding: '16px 18px', borderRadius: 8, border: '1px solid var(--c-danger)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-danger)' }}>Delete this module</div>
+                <div style={{ fontSize: 12, color: 'var(--c-fg-muted)', marginTop: 4, lineHeight: 1.5 }}>
+                  Permanently removes the module with its history, commits and generated SDKs. This cannot be undone.
+                  Modules that depend on it will no longer resolve it.
+                </div>
+              </div>
+              <Input
+                value={deleteConfirm}
+                onChange={val => { setDeleteConfirm(val); setDeleteError(null); }}
+                placeholder={`Type ${owner}/${moduleName} to confirm`}
+                ariaLabel="Type the module name to confirm deletion"
+              />
+              <div>
+                <Btn
+                  variant="danger"
+                  disabled={deleting || deleteConfirm !== `${owner}/${moduleName}`}
+                  onClick={() => {
+                    setDeleting(true);
+                    setDeleteError(null);
+                    rpcFetch('/hades.api.registry.v1.ModuleService/DeleteModule', { owner, name: moduleName })
+                      .then(() => { removeRecentModule(`${owner}/${moduleName}`); router.push(`/${owner}`); })
+                      .catch(e => { setDeleteError(formatError(e)); setDeleting(false); });
+                  }}
+                >{deleting ? 'Deleting…' : 'Delete module'}</Btn>
+                {deleteError && <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--c-error)' }}>{deleteError}</span>}
+              </div>
             </div>
           </div>
         </Section>

@@ -179,7 +179,12 @@ type Storage interface {
 	CreateRepository(ctx context.Context, repoPath, defaultBranch string) error
 
 	// DeleteRepository removes the repository at repoPath. Used as a
-	// compensating action when a DB transaction fails after repository creation.
+	// compensating action when a DB transaction fails after repository creation,
+	// and by module deletion.
+	//
+	// A repository that does not exist is not an error, so a deletion that
+	// removed the repository but failed to commit its database transaction can
+	// simply be retried.
 	DeleteRepository(ctx context.Context, repoPath string) error
 
 	// PutFiles creates a commit on a branch and returns the resulting commit SHA.

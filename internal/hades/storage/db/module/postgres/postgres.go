@@ -212,6 +212,18 @@ func (m *ModuleStorage) CountByOwner(ctx context.Context, ownerID string) (int32
 	return count, err
 }
 
+func (m *ModuleStorage) Delete(ctx context.Context, moduleID string) error {
+	// Resources first: the commit ids are read from the rows the second
+	// statement cascades away.
+	if _, err := m.q(ctx).Exec(ctx,
+		`DELETE FROM resources WHERE id = $1 OR id IN (SELECT id FROM commits WHERE module_id = $1)`, moduleID,
+	); err != nil {
+		return err
+	}
+	_, err := m.q(ctx).Exec(ctx, `DELETE FROM modules WHERE id = $1`, moduleID)
+	return err
+}
+
 var _ module.Storage = (*ModuleStorage)(nil)
 
 // visibilityPredicate narrows a module query to rows the caller may plausibly

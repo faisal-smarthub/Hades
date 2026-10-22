@@ -157,6 +157,17 @@ message UpdateModuleResponse {
   Module module = 1;
 }
 
+// DeleteModuleRequest is the input for ModuleService.DeleteModule.
+message DeleteModuleRequest {
+  // Username of the module owner.
+  string owner = 1 [(buf.validate.field).string.min_len = 1];
+  // Short module name (without the owner prefix).
+  string name = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+// DeleteModuleResponse is empty.
+message DeleteModuleResponse {}
+
 // GetModuleRequest is the input for ModuleService.GetModule.
 message GetModuleRequest {
   // Username of the module owner.
@@ -207,4 +218,18 @@ service ModuleService {
   // is also the answer for a module that does not exist, since no caller holds
   // update rights over a name that was never created.
   rpc UpdateModule(UpdateModuleRequest) returns (UpdateModuleResponse);
+
+  // DeleteModule permanently removes a module: its repository and history,
+  // commits, CI runs and SDK jobs. It requires module:delete, which the
+  // namespace owner, organization admins and superadmins hold, and an
+  // interactive session; a personal API token is refused.
+  //
+  // Hades does not record dependencies between modules, so nothing stops the
+  // deletion of a module that others depend on. Their buf.lock pins stop
+  // resolving.
+  //
+  // Returns PERMISSION_DENIED if the caller does not have delete access, which
+  // is also the answer for a module that does not exist and a caller with no
+  // rights over its namespace.
+  rpc DeleteModule(DeleteModuleRequest) returns (DeleteModuleResponse);
 }

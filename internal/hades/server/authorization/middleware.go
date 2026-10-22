@@ -142,6 +142,9 @@ var sessionOnlyProcedures = map[string]bool{
 	"/hades.api.identity.v1.AdminService/SetUserState":  true,
 	"/hades.api.identity.v1.AdminService/DeleteUser":    true,
 	"/hades.api.identity.v1.AdminService/SetSuperadmin": true,
+	// Deleting a module cannot be undone; a PAT leaked from a CI log must not
+	// be able to erase a namespace's history.
+	"/hades.api.registry.v1.ModuleService/DeleteModule": true,
 }
 
 // patOnlyProcedures require a PAT (hades1_ token).

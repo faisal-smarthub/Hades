@@ -50,6 +50,9 @@ const (
 	// ModuleServiceUpdateModuleProcedure is the fully-qualified name of the ModuleService's
 	// UpdateModule RPC.
 	ModuleServiceUpdateModuleProcedure = "/hades.api.registry.v1.ModuleService/UpdateModule"
+	// ModuleServiceDeleteModuleProcedure is the fully-qualified name of the ModuleService's
+	// DeleteModule RPC.
+	ModuleServiceDeleteModuleProcedure = "/hades.api.registry.v1.ModuleService/DeleteModule"
 )
 
 // ModuleServiceClient is a client for the hades.api.registry.v1.ModuleService service.
@@ -76,6 +79,19 @@ type ModuleServiceClient interface {
 	// is also the answer for a module that does not exist, since no caller holds
 	// update rights over a name that was never created.
 	UpdateModule(context.Context, *connect.Request[v1.UpdateModuleRequest]) (*connect.Response[v1.UpdateModuleResponse], error)
+	// DeleteModule permanently removes a module: its repository and history,
+	// commits, CI runs and SDK jobs. It requires module:delete, which the
+	// namespace owner, organization admins and superadmins hold, and an
+	// interactive session; a personal API token is refused.
+	//
+	// Hades does not record dependencies between modules, so nothing stops the
+	// deletion of a module that others depend on. Their buf.lock pins stop
+	// resolving.
+	//
+	// Returns PERMISSION_DENIED if the caller does not have delete access, which
+	// is also the answer for a module that does not exist and a caller with no
+	// rights over its namespace.
+	DeleteModule(context.Context, *connect.Request[v1.DeleteModuleRequest]) (*connect.Response[v1.DeleteModuleResponse], error)
 }
 
 // NewModuleServiceClient constructs a client for the hades.api.registry.v1.ModuleService service.
@@ -113,6 +129,12 @@ func NewModuleServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(moduleServiceMethods.ByName("UpdateModule")),
 			connect.WithClientOptions(opts...),
 		),
+		deleteModule: connect.NewClient[v1.DeleteModuleRequest, v1.DeleteModuleResponse](
+			httpClient,
+			baseURL+ModuleServiceDeleteModuleProcedure,
+			connect.WithSchema(moduleServiceMethods.ByName("DeleteModule")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -122,6 +144,7 @@ type moduleServiceClient struct {
 	listModules        *connect.Client[v1.ListModulesRequest, v1.ListModulesResponse]
 	getModule          *connect.Client[v1.GetModuleRequest, v1.GetModuleResponse]
 	updateModule       *connect.Client[v1.UpdateModuleRequest, v1.UpdateModuleResponse]
+	deleteModule       *connect.Client[v1.DeleteModuleRequest, v1.DeleteModuleResponse]
 }
 
 // CreateModuleByName calls hades.api.registry.v1.ModuleService.CreateModuleByName.
@@ -142,6 +165,11 @@ func (c *moduleServiceClient) GetModule(ctx context.Context, req *connect.Reques
 // UpdateModule calls hades.api.registry.v1.ModuleService.UpdateModule.
 func (c *moduleServiceClient) UpdateModule(ctx context.Context, req *connect.Request[v1.UpdateModuleRequest]) (*connect.Response[v1.UpdateModuleResponse], error) {
 	return c.updateModule.CallUnary(ctx, req)
+}
+
+// DeleteModule calls hades.api.registry.v1.ModuleService.DeleteModule.
+func (c *moduleServiceClient) DeleteModule(ctx context.Context, req *connect.Request[v1.DeleteModuleRequest]) (*connect.Response[v1.DeleteModuleResponse], error) {
+	return c.deleteModule.CallUnary(ctx, req)
 }
 
 // ModuleServiceHandler is an implementation of the hades.api.registry.v1.ModuleService service.
@@ -168,6 +196,19 @@ type ModuleServiceHandler interface {
 	// is also the answer for a module that does not exist, since no caller holds
 	// update rights over a name that was never created.
 	UpdateModule(context.Context, *connect.Request[v1.UpdateModuleRequest]) (*connect.Response[v1.UpdateModuleResponse], error)
+	// DeleteModule permanently removes a module: its repository and history,
+	// commits, CI runs and SDK jobs. It requires module:delete, which the
+	// namespace owner, organization admins and superadmins hold, and an
+	// interactive session; a personal API token is refused.
+	//
+	// Hades does not record dependencies between modules, so nothing stops the
+	// deletion of a module that others depend on. Their buf.lock pins stop
+	// resolving.
+	//
+	// Returns PERMISSION_DENIED if the caller does not have delete access, which
+	// is also the answer for a module that does not exist and a caller with no
+	// rights over its namespace.
+	DeleteModule(context.Context, *connect.Request[v1.DeleteModuleRequest]) (*connect.Response[v1.DeleteModuleResponse], error)
 }
 
 // NewModuleServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -201,6 +242,12 @@ func NewModuleServiceHandler(svc ModuleServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(moduleServiceMethods.ByName("UpdateModule")),
 		connect.WithHandlerOptions(opts...),
 	)
+	moduleServiceDeleteModuleHandler := connect.NewUnaryHandler(
+		ModuleServiceDeleteModuleProcedure,
+		svc.DeleteModule,
+		connect.WithSchema(moduleServiceMethods.ByName("DeleteModule")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hades.api.registry.v1.ModuleService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModuleServiceCreateModuleByNameProcedure:
@@ -211,6 +258,8 @@ func NewModuleServiceHandler(svc ModuleServiceHandler, opts ...connect.HandlerOp
 			moduleServiceGetModuleHandler.ServeHTTP(w, r)
 		case ModuleServiceUpdateModuleProcedure:
 			moduleServiceUpdateModuleHandler.ServeHTTP(w, r)
+		case ModuleServiceDeleteModuleProcedure:
+			moduleServiceDeleteModuleHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -234,4 +283,8 @@ func (UnimplementedModuleServiceHandler) GetModule(context.Context, *connect.Req
 
 func (UnimplementedModuleServiceHandler) UpdateModule(context.Context, *connect.Request[v1.UpdateModuleRequest]) (*connect.Response[v1.UpdateModuleResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hades.api.registry.v1.ModuleService.UpdateModule is not implemented"))
+}
+
+func (UnimplementedModuleServiceHandler) DeleteModule(context.Context, *connect.Request[v1.DeleteModuleRequest]) (*connect.Response[v1.DeleteModuleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hades.api.registry.v1.ModuleService.DeleteModule is not implemented"))
 }
