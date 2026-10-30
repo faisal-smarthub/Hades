@@ -1,6 +1,6 @@
 'use client';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { rpcFetch } from '@/lib/rpc';
@@ -34,7 +34,6 @@ async function completeOAuth(provider: string, code: string, state: string): Pro
 }
 
 function OAuthCallbackContent() {
-  const router = useRouter();
   const { setAuth } = useAuthStore();
   const params = useParams<{ provider: string }>();
   const searchParams = useSearchParams();
@@ -71,11 +70,13 @@ function OAuthCallbackContent() {
       .then(async ({ token, username }) => {
         await setAuth(token, username);
         // replace, not push: the code and state are spent, so going back to
-        // this URL can only fail.
-        router.replace('/');
+        // this URL can only fail. A full page load, not router.replace, for the
+        // same reason as login: a soft navigation can replay a redirect to
+        // /login cached while signed out.
+        window.location.replace('/');
       })
       .catch(e => setError(formatError(e)));
-  }, [params.provider, searchParams, router, setAuth]);
+  }, [params.provider, searchParams, setAuth]);
 
   return (
     <Card style={{ padding: '32px 36px' }}>

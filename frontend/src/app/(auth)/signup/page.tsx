@@ -59,7 +59,9 @@ export default function PageSignup() {
       await rpcFetch('/hades.api.auth.v1.AuthenticationService/Register', { username, email, password });
       try {
         const data = await rpcFetch<{ token: string }>('/hades.api.auth.v1.AuthenticationService/Login', { username, password });
-        if (data.token) { await setAuth(data.token, username); router.push('/'); return; }
+        // Full page load for the same reason as login: a soft navigation can
+        // replay a redirect to /login cached while signed out.
+        if (data.token) { await setAuth(data.token, username); window.location.assign('/'); return; }
       } catch { /* login after register failed, redirect to login page */ }
       router.push('/login');
     } catch (e) {
