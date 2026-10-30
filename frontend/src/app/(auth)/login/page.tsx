@@ -1,6 +1,5 @@
 'use client';
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { rpcFetch } from '@/lib/rpc';
@@ -20,7 +19,6 @@ const GitHubIcon = () => (
 );
 
 export default function PageLogin() {
-  const router = useRouter();
   const { setAuth } = useAuthStore();
   const signupEnabled = useSignupEnabled();
   const [username, setUsername] = useState('');
@@ -38,7 +36,12 @@ export default function PageLogin() {
       const data = await rpcFetch<{ token: string }>('/hades.api.auth.v1.AuthenticationService/Login', { username, password });
       if (!data.token) throw new Error('No token returned');
       await setAuth(data.token, username);
-      router.push('/');
+      // A full page load, not router.push. Prefetches made while signed out
+      // (the AppShell around /verify-email prefetches its nav links) cached
+      // the proxy's redirect to /login in the client router, and a soft
+      // navigation to / replayed it: the login succeeded and the page stayed
+      // put. Loading / fresh drops that cache now that the cookie exists.
+      window.location.assign('/');
     } catch (e) {
       setError(formatError(e));
     } finally {
