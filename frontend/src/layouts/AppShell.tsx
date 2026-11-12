@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { getSidebarCollapsed, setSidebarCollapsed, getTheme, setTheme, getRecentModules, getUsername, isSignedIn } from '../lib/auth';
+import { getSidebarCollapsed, setSidebarCollapsed, getTheme, setTheme, getRecentModules, getUsername, isSignedIn, RECENT_EVENT } from '../lib/auth';
 import { rpcFetch } from '../lib/rpc';
 import { useSignupEnabled } from '../lib/useSignupEnabled';
 import { useAuthStore } from '../stores/authStore';
@@ -95,6 +95,12 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // cookie, which is a display value rather than a credential, is what this
     // browser has to go on; the server is the authority either way.
     setIsAuthenticated(isSignedIn());
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setRecentModules(getRecentModules());
+    window.addEventListener(RECENT_EVENT, refresh);
+    return () => window.removeEventListener(RECENT_EVENT, refresh);
   }, []);
 
   // Fetch current user on mount
