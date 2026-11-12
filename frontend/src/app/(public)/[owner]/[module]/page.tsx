@@ -163,8 +163,15 @@ function ModuleDetailContent() {
         });
       })
       .catch(e => {
-        if (isNotFound(e)) setNotFound(true);
-        else setError(formatError(e));
+        if (isNotFound(e)) {
+          setNotFound(true);
+          // The recent list is browser-local and was only pruned by deleting
+          // from this page, so a module deleted elsewhere, or one this user
+          // can no longer read, stayed in the sidebar and led back here.
+          removeRecentModule(`${owner}/${moduleName}`);
+        } else {
+          setError(formatError(e));
+        }
       })
       .finally(() => setLoading(false));
   }, [owner, moduleName]);

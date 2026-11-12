@@ -116,6 +116,16 @@ export interface RecentModule {
   visibility: string;
 }
 
+// RECENT_EVENT fires on window whenever the recent list changes. The sidebar
+// reads the list once on mount and stays mounted across navigation, so without
+// it an entry pruned on one page stayed visible until the next full reload.
+export const RECENT_EVENT = 'hades:recent-modules';
+
+function saveRecentModules(list: RecentModule[]): void {
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  window.dispatchEvent(new Event(RECENT_EVENT));
+}
+
 export function getRecentModules(): RecentModule[] {
   if (typeof localStorage === 'undefined') return [];
   try {
@@ -128,10 +138,10 @@ export function getRecentModules(): RecentModule[] {
 export function addRecentModule(m: RecentModule): void {
   if (typeof localStorage === 'undefined') return;
   const existing = getRecentModules().filter(r => r.fullName !== m.fullName);
-  localStorage.setItem(RECENT_KEY, JSON.stringify([m, ...existing].slice(0, 4)));
+  saveRecentModules([m, ...existing].slice(0, 4));
 }
 
 export function removeRecentModule(fullName: string): void {
   if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(RECENT_KEY, JSON.stringify(getRecentModules().filter(r => r.fullName !== fullName)));
+  saveRecentModules(getRecentModules().filter(r => r.fullName !== fullName));
 }
